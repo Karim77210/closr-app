@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
+import 'package:closr_app/main.dart' show PendingNavigation;
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/auth_service.dart';
 import 'package:closr_app/widgets/loading_overlay.dart';
@@ -40,6 +41,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Uint8List? _profileImageData;
   bool _isLoading = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    // Coming from Stripe checkout → auto-create as subscriber, skip role selection
+    if (PendingNavigation.checkoutCreatorUid != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _submitSubscriberProfile());
+    }
+  }
 
   @override
   void dispose() {

@@ -224,8 +224,9 @@ class FirestoreService {
         .doc();
     batch.set(msgRef, message.toJson());
 
-    final preview = message.type == 'text' ? message.content : (message.type == 'image' ? '📷 Photo' : '🎬 Vidéo');
+    final preview = message.type == 'text' ? message.content : (message.type == 'image' ? '📷 Photo' : '🎬 Video');
     final convRef = _db.collection(conversationsCollection).doc(convId);
+    final unreadField = message.senderRole == 'creator' ? 'unreadForSubscriber' : 'unreadForCreator';
     batch.set(convRef, {
       'subscriberUid': subscriberUid,
       'creatorUid': creatorUid,
@@ -234,23 +235,43 @@ class FirestoreService {
       'lastMessageType': message.type,
       'lastSenderId': message.senderId,
       'createdAt': FieldValue.serverTimestamp(),
+      unreadField: FieldValue.increment(1),
     }, SetOptions(merge: true));
 
     await batch.commit();
   }
 
-  /// Count today's messages sent by a specific user in a conversation
+  /// Reset unread count when user opens a conversation
+  Future<void> resetUnreadCount(String convId, {required bool isCreator}) async {
+    final field = isCreator ? 'unreadForCreator' : 'unreadForSubscriber';
+    await _db.collection(conversationsCollection).doc(convId).set(
+      {field: 0},
+      SetOptions(merge: true),
+    );
+  }
+
+  /// Stream conversation metadata (live updates for unread badge)
+  Stream<Map<String, dynamic>?> streamConversationMeta(String convId) {
+    return _db
+        .collection(conversationsCollection)
+        .doc(convId)
+        .snapshots()
+        .map((doc) => doc.exists ? doc.data() : null);
+  }
+
+  /// Count messages sent by a user in the last 24 hours (no composite index needed)
   Future<int> getTodayMessageCount(String convId, String senderUid) async {
-    final now = DateTime.now();
-    final startOfDay = Timestamp.fromDate(DateTime(now.year, now.month, now.day));
+    final cutoff = DateTime.now().subtract(const Duration(hours: 24));
     final snapshot = await _db
         .collection(conversationsCollection)
         .doc(convId)
         .collection('messages')
         .where('senderId', isEqualTo: senderUid)
-        .where('timestamp', isGreaterThanOrEqualTo: startOfDay)
         .get();
-    return snapshot.docs.length;
+    return snapshot.docs.where((doc) {
+      final ts = doc.data()['timestamp'] as Timestamp?;
+      return ts != null && ts.toDate().isAfter(cutoff);
+    }).length;
   }
 
   /// Get timestamp of the last message sent by a user in a conversation
@@ -260,12 +281,15 @@ class FirestoreService {
         .doc(convId)
         .collection('messages')
         .where('senderId', isEqualTo: senderUid)
-        .orderBy('timestamp', descending: true)
-        .limit(1)
         .get();
     if (snapshot.docs.isEmpty) return null;
-    final ts = snapshot.docs.first.data()['timestamp'] as Timestamp?;
-    return ts?.toDate();
+    final times = snapshot.docs
+        .map((d) => d.data()['timestamp'] as Timestamp?)
+        .where((ts) => ts != null)
+        .map((ts) => ts!.toDate())
+        .toList()
+      ..sort();
+    return times.isEmpty ? null : times.last;
   }
 
   /// Get conversation metadata (last message preview)

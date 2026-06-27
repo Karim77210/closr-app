@@ -44,6 +44,7 @@ class DiscussionsScreen extends StatelessWidget {
               final sub = subscriptions[index];
               return _ConversationTile(
                 subscription: sub,
+                currentUserUid: user.uid,
                 currentUserIsCreator: isCreator,
               );
             },
@@ -60,10 +61,8 @@ class DiscussionsScreen extends StatelessWidget {
         children: [
           Icon(Icons.chat_outlined, size: 64, color: Colors.grey[300]),
           const SizedBox(height: 16),
-          Text(
-            'No discussions yet',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey[600]),
-          ),
+          Text('No discussions yet',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey[600])),
           const SizedBox(height: 8),
           Text(
             isCreator ? 'Your subscribers will appear here' : 'Subscribe to a creator to start chatting',
@@ -77,20 +76,20 @@ class DiscussionsScreen extends StatelessWidget {
 
 class _ConversationTile extends StatelessWidget {
   final Subscription subscription;
+  final String currentUserUid;
   final bool currentUserIsCreator;
 
   const _ConversationTile({
     required this.subscription,
+    required this.currentUserUid,
     required this.currentUserIsCreator,
   });
 
   @override
   Widget build(BuildContext context) {
-    final otherUid = currentUserIsCreator
-        ? subscription.subscriberUid
-        : subscription.creatorUid;
-
+    final otherUid = currentUserIsCreator ? subscription.subscriberUid : subscription.creatorUid;
     final convId = '${subscription.subscriberUid}_${subscription.creatorUid}';
+    final unreadField = currentUserIsCreator ? 'unreadForCreator' : 'unreadForSubscriber';
 
     return FutureBuilder<AppUser?>(
       future: FirestoreService().getUser(otherUid),
@@ -99,24 +98,25 @@ class _ConversationTile extends StatelessWidget {
         final name = otherUser?.displayName ?? '...';
         final photoUrl = otherUser?.photoUrl;
 
-        return FutureBuilder<Map<String, dynamic>?>(
-          future: FirestoreService().getConversationMeta(convId),
+        return StreamBuilder<Map<String, dynamic>?>(
+          stream: FirestoreService().streamConversationMeta(convId),
           builder: (context, convSnap) {
             final meta = convSnap.data;
             final lastMessage = meta?['lastMessage'] as String? ?? 'No messages yet';
+            final unreadCount = (meta?[unreadField] as int?) ?? 0;
             final lastAt = meta?['lastMessageAt'];
             String? timeLabel;
             if (lastAt != null) {
               try {
                 final dt = (lastAt as dynamic).toDate() as DateTime;
                 final now = DateTime.now();
-                if (now.difference(dt).inHours < 24) {
-                  timeLabel = DateFormat('HH:mm').format(dt);
-                } else {
-                  timeLabel = DateFormat('dd/MM').format(dt);
-                }
+                timeLabel = now.difference(dt).inHours < 24
+                    ? DateFormat('HH:mm').format(dt)
+                    : DateFormat('dd/MM').format(dt);
               } catch (_) {}
             }
+
+            final hasUnread = unreadCount > 0;
 
             return ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -131,16 +131,51 @@ class _ConversationTile extends StatelessWidget {
                       )
                     : null,
               ),
-              title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+              title: Text(
+                name,
+                style: TextStyle(
+                  fontWeight: hasUnread ? FontWeight.bold : FontWeight.w600,
+                ),
+              ),
               subtitle: Text(
                 lastMessage,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                style: TextStyle(
+                  color: hasUnread ? Colors.black87 : Colors.grey[600],
+                  fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
+                  fontSize: 13,
+                ),
               ),
-              trailing: timeLabel != null
-                  ? Text(timeLabel, style: TextStyle(color: Colors.grey[500], fontSize: 12))
-                  : null,
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (timeLabel != null)
+                    Text(
+                      timeLabel,
+                      style: TextStyle(
+                        color: hasUnread ? Colors.blue[600] : Colors.grey[500],
+                        fontSize: 12,
+                        fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                  if (hasUnread) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[600],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        unreadCount > 99 ? '99+' : '$unreadCount',
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => ChatScreen(
                   creatorUid: subscription.creatorUid,

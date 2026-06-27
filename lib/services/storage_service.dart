@@ -5,13 +5,12 @@ class StorageService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
   Future<String> uploadProfileImage(String uid, XFile imageFile) async {
-    final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final ext = imageFile.name.split('.').last.toLowerCase();
+    final contentType = _contentType(ext.isEmpty ? 'jpg' : ext);
+    final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.${ext.isEmpty ? 'jpg' : ext}';
     final ref = _storage.ref('profile_images/$uid/$fileName');
     final bytes = await imageFile.readAsBytes();
-
-    final metadata = SettableMetadata(contentType: 'image/jpeg');
-    await ref.putData(bytes, metadata);
-
+    await ref.putData(bytes, SettableMetadata(contentType: contentType));
     return await ref.getDownloadURL();
   }
 

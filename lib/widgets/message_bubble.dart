@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intl/intl.dart';
 import 'package:video_player/video_player.dart';
 import 'package:closr_app/models/message_model.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
   final bool isMe;
+  final VoidCallback? onMediaTap;
 
-  const MessageBubble({Key? key, required this.message, required this.isMe}) : super(key: key);
+  const MessageBubble({Key? key, required this.message, required this.isMe, this.onMediaTap}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +37,23 @@ class MessageBubble extends StatelessWidget {
             bottomLeft: Radius.circular(isMe ? 16 : 4),
             bottomRight: Radius.circular(isMe ? 4 : 16),
           ),
-          child: _buildContent(context),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _buildContent(context),
+              Padding(
+                padding: const EdgeInsets.only(right: 10, bottom: 5, left: 10),
+                child: Text(
+                  DateFormat('HH:mm').format(message.timestamp),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isMe ? Colors.white60 : Colors.grey[500],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -45,18 +62,46 @@ class MessageBubble extends StatelessWidget {
   Widget _buildContent(BuildContext context) {
     switch (message.type) {
       case 'image':
-        return _ImageMessage(url: message.mediaUrl!, isMe: isMe);
+        return GestureDetector(
+          onTap: onMediaTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ImageMessage(url: message.mediaUrl!, isMe: isMe),
+              if (message.content.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+                  child: Text(message.content,
+                      style: TextStyle(color: isMe ? Colors.white : Colors.black87, fontSize: 14)),
+                ),
+            ],
+          ),
+        );
       case 'video':
-        return _VideoMessage(url: message.mediaUrl!, isMe: isMe);
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onMediaTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _VideoMessage(url: message.mediaUrl!, isMe: isMe),
+              if (message.content.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+                  child: Text(message.content,
+                      style: TextStyle(color: isMe ? Colors.white : Colors.black87, fontSize: 14)),
+                ),
+            ],
+          ),
+        );
       default:
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Text(
             message.content,
-            style: TextStyle(
-              color: isMe ? Colors.white : Colors.black87,
-              fontSize: 15,
-            ),
+            style: TextStyle(color: isMe ? Colors.white : Colors.black87, fontSize: 15),
           ),
         );
     }
@@ -73,15 +118,19 @@ class _ImageMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 260, maxHeight: 320),
-      child: CachedNetworkImage(
-        imageUrl: url,
+      child: Image.network(
+        url,
         fit: BoxFit.cover,
-        placeholder: (_, __) => const SizedBox(
-          width: 200,
-          height: 150,
-          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        loadingBuilder: (_, child, progress) => progress == null
+            ? child
+            : const SizedBox(
+                width: 200, height: 150,
+                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              ),
+        errorBuilder: (_, __, ___) => const SizedBox(
+          width: 80, height: 80,
+          child: Center(child: Icon(Icons.broken_image, size: 40, color: Colors.grey)),
         ),
-        errorWidget: (_, __, ___) => const Icon(Icons.broken_image, size: 48),
       ),
     );
   }
@@ -126,24 +175,16 @@ class _VideoMessageState extends State<_VideoMessage> {
               children: [
                 AspectRatio(
                   aspectRatio: _controller.value.aspectRatio,
-                  child: VideoPlayer(_controller),
+                  child: IgnorePointer(child: VideoPlayer(_controller)),
                 ),
-                GestureDetector(
-                  onTap: () => setState(() {
-                    _controller.value.isPlaying ? _controller.pause() : _controller.play();
-                  }),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withAlpha(80),
-                      shape: BoxShape.circle,
-                    ),
-                    padding: const EdgeInsets.all(12),
-                    child: Icon(
-                      _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
-                      color: Colors.white,
-                      size: 32,
-                    ),
+                // Thumbnail overlay — tap handled by parent GestureDetector
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(60),
+                    shape: BoxShape.circle,
                   ),
+                  padding: const EdgeInsets.all(14),
+                  child: const Icon(Icons.play_arrow, color: Colors.white, size: 36),
                 ),
               ],
             )
