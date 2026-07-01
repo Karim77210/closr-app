@@ -81,13 +81,14 @@ export const createCheckoutSession = functions.https.onRequest((req, res) => {
         await db.collection('users').doc(creatorUid).update({ stripePriceId });
       }
 
-      const appUrl = process.env.APP_URL || 'http://localhost:3000';
+      // Use the request's origin so any localhost port works in dev
+      const appUrl = req.headers.origin || process.env.APP_URL || 'http://localhost:3000';
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
         customer: stripeCustomerId,
         line_items: [{ price: stripePriceId, quantity: 1 }],
-        success_url: `${appUrl}/subscription-success?session_id={CHECKOUT_SESSION_ID}&creator=${creator.username}`,
-        cancel_url: `${appUrl}/${creator.username}`,
+        success_url: `${appUrl}/#/subscription-success?session_id={CHECKOUT_SESSION_ID}&creator=${creator.username}`,
+        cancel_url: `${appUrl}/#/${creator.username}`,
         metadata: { subscriberUid, creatorUid, type: 'direct_message' },
       });
 
@@ -210,3 +211,190 @@ async function findSubscriptionDoc(stripeSubscriptionId: string) {
 
   return query.empty ? null : query.docs[0];
 }
+
+// ─── Creator Earnings ────────────────────────────────────────────────────────
+
+export const getCreatorEarnings = functions.https.onRequest((req, res) => {
+  corsHandler(req, res, async () => {
+    if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+    if (req.method !== 'GET') { res.status(405).json({ error: 'Method not allowed' }); return; }
+
+    try {
+      const authHeader = req.headers.authorization ?? '';
+      if (!authHeader.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return; }
+      const decoded = await admin.auth().verifyIdToken(authHeader.split('Bearer ')[1]);
+      const creatorUid = decoded.uid;
+
+      // Get all subscriptions (active + canceled) for this creator
+      const subsSnap = await db.collection('subscriptions')
+        .where('creatorUid', '==', creatorUid)
+        .get();
+
+      // Fetch Stripe invoices for each subscription in parallel
+      const subscriberData = await Promise.all(subsSnap.docs.map(async (doc) => {
+        const sub = doc.data();
+        let invoices: { amountPaid: number; date: string; status: string }[] = [];
+        try {
+          const stripeInvoices = await stripe.invoices.list({
+            subscription: sub.stripeSubscriptionId,
+            limit: 24,
+          });
+          invoices = stripeInvoices.data
+            .filter(inv => inv.status === 'paid' && inv.amount_paid > 0)
+            .map(inv => ({
+              amountPaid: inv.amount_paid,
+              date: new Date(inv.created * 1000).toISOString(),
+              status: inv.status ?? 'unknown',
+            }));
+        } catch (_) { /* skip if subscription not found in Stripe */ }
+
+        return {
+          subscriberUid: sub.subscriberUid as string,
+          stripeSubscriptionId: sub.stripeSubscriptionId as string,
+          subscriptionStatus: sub.status as string,
+          invoices,
+        };
+      }));
+
+      res.json({ subscribers: subscriberData });
+    } catch (err) {
+      console.error('getCreatorEarnings error:', err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+});
+
+// ─── Stripe Connect Onboarding ───────────────────────────────────────────────
+
+export const createConnectOnboarding = functions.https.onRequest((req, res) => {
+  corsHandler(req, res, async () => {
+    if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+    if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
+
+    try {
+      const authHeader = req.headers.authorization ?? '';
+      if (!authHeader.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return; }
+      const decoded = await admin.auth().verifyIdToken(authHeader.split('Bearer ')[1]);
+      const creatorUid = decoded.uid;
+
+      const userDoc = await db.collection('users').doc(creatorUid).get();
+      const user = userDoc.data()!;
+
+      let connectAccountId = user.stripeConnectAccountId as string | undefined;
+
+      // Create Express account if not exists
+      if (!connectAccountId) {
+        const account = await stripe.accounts.create({
+          type: 'express',
+          country: 'FR',
+          email: user.email as string,
+          capabilities: { transfers: { requested: true } },
+          metadata: { firebaseUid: creatorUid },
+        });
+        connectAccountId = account.id;
+        await db.collection('users').doc(creatorUid).update({ stripeConnectAccountId: connectAccountId });
+      }
+
+      // Check if already fully onboarded
+      const account = await stripe.accounts.retrieve(connectAccountId);
+      if (account.details_submitted) {
+        await db.collection('users').doc(creatorUid).update({ stripeConnectOnboarded: true });
+        res.json({ alreadyOnboarded: true });
+        return;
+      }
+
+      const appUrl = req.headers.origin || process.env.APP_URL || 'http://localhost:3000';
+      const accountLink = await stripe.accountLinks.create({
+        account: connectAccountId,
+        type: 'account_onboarding',
+        return_url: `${appUrl}/#/wallet-connect-success`,
+        refresh_url: `${appUrl}/#/wallet`,
+      });
+
+      res.json({ url: accountLink.url });
+    } catch (err) {
+      console.error('createConnectOnboarding error:', err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+});
+
+// ─── Stripe Express Dashboard Link ───────────────────────────────────────────
+
+export const createStripeLoginLink = functions.https.onRequest((req, res) => {
+  corsHandler(req, res, async () => {
+    if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+    if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
+
+    try {
+      const authHeader = req.headers.authorization ?? '';
+      if (!authHeader.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return; }
+      const decoded = await admin.auth().verifyIdToken(authHeader.split('Bearer ')[1]);
+      const userDoc = await db.collection('users').doc(decoded.uid).get();
+      const connectAccountId = userDoc.data()?.stripeConnectAccountId as string | undefined;
+      if (!connectAccountId) { res.status(400).json({ error: 'No Connect account found' }); return; }
+
+      const loginLink = await stripe.accounts.createLoginLink(connectAccountId);
+      res.json({ url: loginLink.url });
+    } catch (err) {
+      console.error('createStripeLoginLink error:', err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+});
+
+// ─── Request Payout ──────────────────────────────────────────────────────────
+
+export const requestPayout = functions.https.onRequest((req, res) => {
+  corsHandler(req, res, async () => {
+    if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+    if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
+
+    try {
+      const authHeader = req.headers.authorization ?? '';
+      if (!authHeader.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return; }
+      const decoded = await admin.auth().verifyIdToken(authHeader.split('Bearer ')[1]);
+      const creatorUid = decoded.uid;
+
+      const { amountCents } = req.body as { amountCents: number };
+      if (!amountCents || amountCents <= 0) {
+        res.status(400).json({ error: 'Invalid amount' }); return;
+      }
+
+      const userDoc = await db.collection('users').doc(creatorUid).get();
+      const user = userDoc.data()!;
+      const connectAccountId = user.stripeConnectAccountId as string | undefined;
+
+      if (!connectAccountId || !user.stripeConnectOnboarded) {
+        res.status(400).json({ error: 'Stripe Connect account not configured' }); return;
+      }
+
+      // Create Firestore payout_request doc first
+      const requestRef = await db.collection('payout_requests').add({
+        creatorUid,
+        amount: amountCents,
+        status: 'pending',
+        requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Transfer from platform to creator's Connect account
+      const transfer = await stripe.transfers.create({
+        amount: amountCents,
+        currency: 'eur',
+        destination: connectAccountId,
+        metadata: { creatorUid, payoutRequestId: requestRef.id },
+      });
+
+      await requestRef.update({
+        status: 'paid',
+        stripeTransferId: transfer.id,
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      res.json({ success: true, transferId: transfer.id });
+    } catch (err) {
+      console.error('requestPayout error:', err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+});

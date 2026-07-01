@@ -5,6 +5,7 @@ import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/auth_service.dart';
 import 'package:closr_app/services/firestore_service.dart';
 import 'package:closr_app/screens/creator_settings_screen.dart';
+import 'package:closr_app/screens/wallet_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final AppUser user;
@@ -145,7 +146,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
+
+                // Wallet card — creators only
+                if (widget.user.role == UserRole.creator) ...[
+                  _buildWalletCard(context),
+                  const SizedBox(height: 32),
+                ] else
+                  const SizedBox(height: 32),
 
                 // Settings section
                 Text(
@@ -206,17 +214,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         icon: Icons.trending_up_outlined,
                         title: 'Analytics',
                         subtitle: 'View your subscriber stats',
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Coming soon!')),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildSettingsTile(
-                        icon: Icons.account_balance_wallet_outlined,
-                        title: 'Payout Settings',
-                        subtitle: 'Manage your payments',
                         onTap: () {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Coming soon!')),
@@ -341,6 +338,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => _EditSubscriberSheet(user: widget.user),
+    );
+  }
+
+  Widget _buildWalletCard(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.black87,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Balance',
+                  style: TextStyle(color: Colors.white.withAlpha(160), fontSize: 13),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '€ ···',
+                  style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+          OutlinedButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => WalletScreen(creator: widget.user)),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Colors.white54),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+            child: const Text('View wallet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
     );
   }
 

@@ -10,10 +10,12 @@ import 'screens/onboarding_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/creator_public_page.dart';
 import 'screens/subscription_success_screen.dart';
+import 'screens/wallet_screen.dart';
 
 class PendingNavigation {
   static String? returnTo;
   static String? checkoutCreatorUid;
+  static String? username; // Username chosen at signup, pre-filled in onboarding
 }
 
 void main() async {
@@ -58,6 +60,10 @@ class MyApp extends StatelessWidget {
         final path = uri.pathSegments.first;
         const reservedRoutes = {'login', 'home', 'profile', 'onboarding'};
 
+        if (path == 'wallet-connect-success') {
+          return MaterialPageRoute(builder: (_) => const WalletConnectSuccessScreen());
+        }
+
         if (path == 'subscription-success') {
           final creatorUsername = uri.queryParameters['creator'] ?? '';
           return MaterialPageRoute(
@@ -90,6 +96,11 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   late final AuthService _authService;
+  // Cache futures by uid so rebuilds don't recreate them (avoids OnboardingScreen reset)
+  final Map<String, Future<AppUser?>> _profileFutures = {};
+
+  Future<AppUser?> _profileFuture(String uid) =>
+      _profileFutures.putIfAbsent(uid, () => _authService.getUserProfile(uid));
 
   @override
   void initState() {
@@ -105,14 +116,13 @@ class _AuthWrapperState extends State<AuthWrapper> {
         // Loading state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 
         // Not authenticated - show login
         if (!snapshot.hasData) {
+          _profileFutures.clear(); // clear cache on sign-out
           return const LoginScreen();
         }
 
@@ -120,7 +130,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         // Authenticated - check if profile exists
         return FutureBuilder<AppUser?>(
-          future: _authService.getUserProfile(firebaseUser.uid),
+          future: _profileFuture(firebaseUser.uid),
           builder: (context, profileSnapshot) {
             if (profileSnapshot.connectionState == ConnectionState.waiting) {
               return const Scaffold(
@@ -135,7 +145,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
               return OnboardingScreen(
                 uid: firebaseUser.uid,
                 email: firebaseUser.email ?? 'unknown@example.com',
-                displayName: firebaseUser.displayName ?? 'User',
+                displayName: firebaseUser.displayName ?? '',
                 photoUrl: firebaseUser.photoURL,
               );
             }

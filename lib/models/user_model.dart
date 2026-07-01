@@ -22,6 +22,9 @@ class AppUser {
   final bool isActive;
   final String? stripeCustomerId;
   final String? stripePriceId;
+  final String? stripeConnectAccountId;
+  final bool stripeConnectOnboarded;
+  final bool autoPayoutEnabled;
 
   AppUser({
     required this.uid,
@@ -42,6 +45,9 @@ class AppUser {
     required this.updatedAt,
     this.isActive = true,
     this.stripeCustomerId,
+    this.stripeConnectAccountId,
+    this.stripeConnectOnboarded = false,
+    this.autoPayoutEnabled = false,
     this.stripePriceId,
   });
 
@@ -67,6 +73,9 @@ class AppUser {
       'isActive': isActive,
       if (stripeCustomerId != null) 'stripeCustomerId': stripeCustomerId,
       if (stripePriceId != null) 'stripePriceId': stripePriceId,
+      if (stripeConnectAccountId != null) 'stripeConnectAccountId': stripeConnectAccountId,
+      'stripeConnectOnboarded': stripeConnectOnboarded,
+      'autoPayoutEnabled': autoPayoutEnabled,
     };
   }
 
@@ -92,6 +101,9 @@ class AppUser {
       isActive: json['isActive'] as bool? ?? true,
       stripeCustomerId: json['stripeCustomerId'] as String?,
       stripePriceId: json['stripePriceId'] as String?,
+      stripeConnectAccountId: json['stripeConnectAccountId'] as String?,
+      stripeConnectOnboarded: json['stripeConnectOnboarded'] as bool? ?? false,
+      autoPayoutEnabled: json['autoPayoutEnabled'] as bool? ?? false,
     );
   }
 

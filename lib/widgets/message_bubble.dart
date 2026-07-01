@@ -6,9 +6,10 @@ import 'package:closr_app/models/message_model.dart';
 class MessageBubble extends StatelessWidget {
   final Message message;
   final bool isMe;
+  final bool showCaption;
   final VoidCallback? onMediaTap;
 
-  const MessageBubble({Key? key, required this.message, required this.isMe, this.onMediaTap}) : super(key: key);
+  const MessageBubble({Key? key, required this.message, required this.isMe, this.showCaption = true, this.onMediaTap}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +70,7 @@ class MessageBubble extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               _ImageMessage(url: message.mediaUrl!, isMe: isMe),
-              if (message.content.isNotEmpty)
+              if (showCaption && message.content.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
                   child: Text(message.content,
@@ -87,7 +88,7 @@ class MessageBubble extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               _VideoMessage(url: message.mediaUrl!, isMe: isMe),
-              if (message.content.isNotEmpty)
+              if (showCaption && message.content.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
                   child: Text(message.content,

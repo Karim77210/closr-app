@@ -3,56 +3,52 @@ import 'package:closr_app/models/user_model.dart';
 import 'discussions_screen.dart';
 import 'profile_screen.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends StatelessWidget {
   final AppUser user;
 
   const HomeScreen({Key? key, required this.user}) : super(key: key);
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  int _selectedTab = 0;
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedTab,
-        children: [
-          DiscussionsScreen(user: widget.user),
-          ProfileScreen(user: widget.user),
-        ],
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(
-              color: Colors.grey[200]!,
-              width: 1,
+      appBar: AppBar(
+        title: const Text(
+          'Conversations',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: false,
+        elevation: 0,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => ProfileScreen(user: user)),
+              ),
+              child: CircleAvatar(
+                radius: 18,
+                backgroundColor: Colors.blue[100],
+                backgroundImage: user.photoUrl != null && user.photoUrl!.isNotEmpty
+                    ? NetworkImage(user.photoUrl!) as ImageProvider
+                    : null,
+                child: user.photoUrl == null || user.photoUrl!.isEmpty
+                    ? Text(
+                        user.displayName.isNotEmpty
+                            ? user.displayName[0].toUpperCase()
+                            : '?',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue[700],
+                        ),
+                      )
+                    : null,
+              ),
             ),
           ),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _selectedTab,
-          onTap: (index) {
-            setState(() => _selectedTab = index);
-          },
-          items: [
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.chat_outlined),
-              activeIcon: const Icon(Icons.chat),
-              label: 'Discussions',
-            ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.person_outlined),
-              activeIcon: const Icon(Icons.person),
-              label: 'Profil',
-            ),
-          ],
-        ),
+        ],
       ),
+      body: DiscussionsScreen(user: user),
     );
   }
 }

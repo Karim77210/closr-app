@@ -16,11 +16,12 @@ service cloud.firestore {
       // Allow authenticated users to create their own document
       allow create: if isSignedIn() && isUser(userId);
       
-      // Allow any authenticated user to read (needed for username uniqueness queries)
-      allow read: if isSignedIn();
-      
-      // Allow public read of creators for discovery
-      allow read: if resource.data.role == 'creator' && resource.data.isActive == true;
+      // Allow unauthenticated username queries (for signup uniqueness check)
+      allow list: if true;
+      // Allow authenticated users to read any profile
+      allow get: if isSignedIn();
+      // Allow public read of active creators
+      allow get: if resource.data.role == 'creator' && resource.data.isActive == true;
       
       // Allow users to update their own document
       allow update: if isSignedIn() && isUser(userId) && 
@@ -59,6 +60,13 @@ service cloud.firestore {
         allow read: if isSignedIn();
         allow update, delete: if false;
       }
+    }
+
+    // Payout requests — creator creates, Cloud Functions update
+    match /payout_requests/{id} {
+      allow create: if isSignedIn() && isUser(request.resource.data.creatorUid);
+      allow read: if isSignedIn() && isUser(resource.data.creatorUid);
+      allow update, delete: if false;
     }
 
     // Deny all other access

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:closr_app/main.dart' show PendingNavigation;
 import 'package:closr_app/services/auth_service.dart';
+import 'package:closr_app/services/firestore_service.dart';
 import 'package:closr_app/widgets/loading_overlay.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -13,7 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _authService = AuthService();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _displayNameController = TextEditingController();
+  final _usernameController = TextEditingController();
 
   bool _isLoading = false;
   bool _isSignUp = false;
@@ -23,29 +25,14 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _displayNameController.dispose();
+    _usernameController.dispose();
     super.dispose();
-  }
-
-  String? get _returnTo {
-    final args = ModalRoute.of(context)?.settings.arguments;
-    if (args is Map) return args['returnTo'] as String?;
-    return null;
-  }
-
-  void _onAuthSuccess() {
-    final returnTo = _returnTo;
-    if (returnTo != null) {
-      Navigator.of(context).pushReplacementNamed(returnTo);
-    }
-    // Otherwise AuthWrapper handles navigation via authStateChanges
   }
 
   Future<void> _handleSignInWithGoogle() async {
     setState(() { _isLoading = true; _errorMessage = null; });
     try {
       await _authService.signInWithGoogle();
-      if (mounted) _onAuthSuccess();
     } on Exception catch (e) {
       setState(() => _errorMessage = e.toString().replaceFirst('Exception: ', ''));
     } finally {
@@ -65,7 +52,6 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() { _isLoading = true; _errorMessage = null; });
     try {
       await _authService.signInWithEmail(email: email, password: password);
-      if (mounted) _onAuthSuccess();
     } on Exception catch (e) {
       setState(() => _errorMessage = e.toString().replaceFirst('Exception: ', ''));
     } finally {
@@ -76,27 +62,38 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleSignUp() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
-    final displayName = _displayNameController.text.trim();
+    final username = _usernameController.text.trim().toLowerCase();
 
-    if (email.isEmpty || password.isEmpty || displayName.isEmpty) {
+    if (email.isEmpty || password.isEmpty || username.isEmpty) {
       setState(() => _errorMessage = 'Please fill in all fields');
       return;
     }
-
     if (password.length < 6) {
       setState(() => _errorMessage = 'Password must be at least 6 characters');
+      return;
+    }
+    if (RegExp(r'[^a-z0-9_]').hasMatch(username)) {
+      setState(() => _errorMessage = 'Username can only contain letters, numbers and underscores');
       return;
     }
 
     setState(() { _isLoading = true; _errorMessage = null; });
     try {
-      await _authService.signUpWithEmail(
-        email: email,
-        password: password,
-        displayName: displayName,
-      );
-      if (mounted) _onAuthSuccess();
+      // Store username FIRST so onboarding gets it immediately after auth
+      PendingNavigation.username = username;
+
+      // Check uniqueness (unauthenticated — requires Firestore list rule)
+      final taken = await FirestoreService().usernameExists(username);
+      if (taken) {
+        PendingNavigation.username = null;
+        setState(() => _errorMessage = 'This username is already taken');
+        return;
+      }
+
+      // Create Firebase Auth account → triggers navigation to OnboardingScreen
+      await _authService.signUpWithEmail(email: email, password: password);
     } on Exception catch (e) {
+      PendingNavigation.username = null;
       setState(() => _errorMessage = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -122,7 +119,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Logo / Title
                   const SizedBox(height: 40),
                   Text(
                     'closr',
@@ -142,7 +138,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 40),
 
-                  // Error message
                   if (_errorMessage != null)
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -158,53 +153,43 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   if (_errorMessage != null) const SizedBox(height: 16),
 
-                  // Email field
                   TextField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
                       labelText: 'Email',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       prefixIcon: const Icon(Icons.email_outlined),
                     ),
                   ),
                   const SizedBox(height: 16),
 
-                  // Display name (only for sign up)
-                  if (_isSignUp)
-                    Column(
-                      children: [
-                        TextField(
-                          controller: _displayNameController,
-                          decoration: InputDecoration(
-                            labelText: 'Display Name',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            prefixIcon: const Icon(Icons.person_outlined),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
+                  // Username — only on sign up
+                  if (_isSignUp) ...[
+                    TextField(
+                      controller: _usernameController,
+                      decoration: InputDecoration(
+                        labelText: 'Username',
+                        hintText: 'yourname',
+                        prefixText: '@',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        prefixIcon: const Icon(Icons.alternate_email),
+                      ),
                     ),
+                    const SizedBox(height: 16),
+                  ],
 
-                  // Password field
                   TextField(
                     controller: _passwordController,
                     obscureText: true,
                     decoration: InputDecoration(
                       labelText: 'Password',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       prefixIcon: const Icon(Icons.lock_outlined),
                     ),
                   ),
                   const SizedBox(height: 24),
 
-                  // Sign in / Sign up button
                   ElevatedButton(
                     onPressed: _isLoading
                         ? null
@@ -213,66 +198,48 @@ class _LoginScreenState extends State<LoginScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       backgroundColor: Colors.blue[600],
                       disabledBackgroundColor: Colors.grey[300],
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                     child: Text(
                       _isSignUp ? 'Create Account' : 'Sign In',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
                     ),
                   ),
                   const SizedBox(height: 16),
 
-                  // Toggle sign up / sign in
                   TextButton(
                     onPressed: _isLoading
                         ? null
-                        : () {
-                            setState(() {
+                        : () => setState(() {
                               _isSignUp = !_isSignUp;
                               _errorMessage = null;
-                            });
-                          },
+                            }),
                     child: Text(
-                      _isSignUp
-                          ? 'Already have an account? Sign in'
-                          : 'Don\'t have an account? Sign up',
+                      _isSignUp ? 'Already have an account? Sign in' : 'Don\'t have an account? Sign up',
                       style: TextStyle(color: Colors.blue[600]),
                     ),
                   ),
                   const SizedBox(height: 24),
 
-                  // Divider
                   Row(
                     children: [
                       Expanded(child: Divider(color: Colors.grey[300])),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          'or',
-                          style: TextStyle(color: Colors.grey[600]),
-                        ),
+                        child: Text('or', style: TextStyle(color: Colors.grey[600])),
                       ),
                       Expanded(child: Divider(color: Colors.grey[300])),
                     ],
                   ),
                   const SizedBox(height: 24),
 
-                  // Google Sign-In button
                   OutlinedButton.icon(
                     onPressed: _isLoading ? null : _handleSignInWithGoogle,
                     icon: const Icon(Icons.login),
                     label: const Text('Continue with Google'),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                   const SizedBox(height: 40),

@@ -18,6 +18,7 @@ class CreatorSettingsScreen extends StatefulWidget {
 class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
   final _authService = AuthService();
   final _imagePicker = ImagePicker();
+  final _displayNameController = TextEditingController();
   final _usernameController = TextEditingController();
   final _bioController = TextEditingController();
   final _priceController = TextEditingController();
@@ -35,6 +36,7 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
   @override
   void initState() {
     super.initState();
+    _displayNameController.text = widget.user.displayName;
     _usernameController.text = widget.user.username;
     _bioController.text = widget.user.bio;
     _priceController.text = (widget.user.subscriptionPriceCents / 100).toStringAsFixed(0);
@@ -47,6 +49,7 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
 
   @override
   void dispose() {
+    _displayNameController.dispose();
     _usernameController.dispose();
     _bioController.dispose();
     _priceController.dispose();
@@ -75,6 +78,7 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
   }
 
   Future<void> _saveSettings() async {
+    final displayName = _displayNameController.text.trim();
     final username = _usernameController.text.trim().toLowerCase();
     final bio = _bioController.text.trim();
     final price = int.tryParse(_priceController.text.trim()) ?? 0;
@@ -109,6 +113,7 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
     try {
       await _authService.updateUserProfile(
         uid: widget.user.uid,
+        displayName: displayName.isNotEmpty ? displayName : null,
         username: username,
         bio: bio,
         subscriptionPriceCents: price * 100,
@@ -161,6 +166,12 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
                 children: [
                   _buildUploadPhotoCard(context, photoProvider),
                   const SizedBox(height: 20),
+                  _buildTextField(
+                    controller: _displayNameController,
+                    label: 'Full name',
+                    hint: 'Your first and last name',
+                  ),
+                  const SizedBox(height: 16),
                   _buildTextField(
                     controller: _usernameController,
                     label: 'Username',

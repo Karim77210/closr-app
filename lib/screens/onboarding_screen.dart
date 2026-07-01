@@ -1,10 +1,17 @@
+import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:typed_data';
 import 'package:closr_app/main.dart' show PendingNavigation;
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/auth_service.dart';
 import 'package:closr_app/widgets/loading_overlay.dart';
+
+const _funNames = [
+  'Brave Panda', 'Swift Falcon', 'Curious Otter', 'Quiet Tiger',
+  'Happy Koala', 'Bold Eagle', 'Gentle Whale', 'Clever Fox',
+  'Wise Owl', 'Playful Lynx', 'Fierce Jaguar', 'Shy Rabbit',
+];
 
 class OnboardingScreen extends StatefulWidget {
   final String uid;
@@ -27,7 +34,9 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final _authService = AuthService();
   final _imagePicker = ImagePicker();
-  final _usernameController = TextEditingController();
+  late final String _funNameHint = _funNames[Random().nextInt(_funNames.length)];
+  late final TextEditingController _displayNameController;
+  late final TextEditingController _usernameController;
   final _bioController = TextEditingController();
   final _priceController = TextEditingController(text: '20');
   final _limitController = TextEditingController(text: '50');
@@ -45,14 +54,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   void initState() {
     super.initState();
-    // Coming from Stripe checkout → auto-create as subscriber, skip role selection
+
+    // Capture & clear username from signup
+    final signupUsername = PendingNavigation.username ?? '';
+    PendingNavigation.username = null;
+
+    _usernameController = TextEditingController(text: signupUsername);
+    _displayNameController = TextEditingController(
+      text: widget.displayName.isNotEmpty ? widget.displayName : _funNameHint,
+    );
+
+    // Coming from Stripe checkout → go directly to subscriber form, skip role selection
     if (PendingNavigation.checkoutCreatorUid != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _submitSubscriberProfile());
+      _selectedRole = UserRole.subscriber; // synchronous, no flash
     }
   }
 
   @override
   void dispose() {
+    _displayNameController.dispose();
     _usernameController.dispose();
     _bioController.dispose();
     _priceController.dispose();
@@ -85,12 +105,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _selectedRole = role;
       _errorMessage = null;
     });
-    if (role == UserRole.subscriber) {
-      await _submitSubscriberProfile();
-    }
   }
 
   Future<void> _submitSubscriberProfile() async {
+    final username = _usernameController.text.trim().toLowerCase();
+    final displayName = _displayNameController.text.trim().isNotEmpty
+        ? _displayNameController.text.trim()
+        : _funNameHint;
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -99,8 +121,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       await _authService.createUserProfile(
         uid: widget.uid,
         email: widget.email,
-        displayName: widget.displayName,
+        displayName: displayName,
         role: UserRole.subscriber,
+        username: username,
+        photoFile: _profileImage,
         photoUrl: widget.photoUrl,
       );
 
@@ -117,6 +141,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _submitCreatorProfile() async {
+    final displayName = _displayNameController.text.trim().isNotEmpty
+        ? _displayNameController.text.trim()
+        : _funNameHint;
     final username = _usernameController.text.trim().toLowerCase();
     final bio = _bioController.text.trim();
     final price = int.tryParse(_priceController.text.trim()) ?? 0;
@@ -126,10 +153,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final cooldown = int.tryParse(_messageCooldownController.text.trim()) ?? 20;
     final daily = int.tryParse(_messageDailyController.text.trim()) ?? 10;
 
-    if (username.isEmpty) {
-      setState(() => _errorMessage = 'Please choose a username.');
-      return;
-    }
     if (bio.length > 100) {
       setState(() => _errorMessage = 'Bio must be 100 characters or fewer.');
       return;
@@ -152,7 +175,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       await _authService.createUserProfile(
         uid: widget.uid,
         email: widget.email,
-        displayName: widget.displayName,
+        displayName: displayName,
         role: UserRole.creator,
         username: username,
         bio: bio,
@@ -271,10 +294,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     _buildUploadPhotoCard(context),
                     const SizedBox(height: 16),
                     _buildTextField(
-                      controller: _usernameController,
-                      label: 'Username',
-                      hint: 'choose your unique username',
+                      controller: _displayNameController,
+                      label: 'Display name',
+                      hint: 'Your name or anything you like',
                     ),
+                    // Show username only for Google users (email users set it at signup)
                     const SizedBox(height: 16),
                     _buildTextField(
                       controller: _bioController,
@@ -336,10 +360,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       child: const Text('Complete Creator Setup'),
                     ),
                   ] else ...[
+                    _buildUploadPhotoCard(context),
                     const SizedBox(height: 16),
-                    Text(
-                      'You are about to finish your subscriber account setup.',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                    _buildTextField(
+                      controller: _displayNameController,
+                      label: 'Display name',
+                      hint: 'Your name or anything you like',
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton(
@@ -350,7 +376,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text('Complete Subscriber Setup'),
+                      child: const Text('Complete Setup'),
                     ),
                   ],
                 ],

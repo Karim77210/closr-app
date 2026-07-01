@@ -160,61 +160,61 @@ class _ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
-  Future<void> _pickAndPreviewMedia(String type) async {
-    XFile? file;
-    if (type == 'image') {
-      file = await _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 85);
-    } else {
-      file = await _imagePicker.pickVideo(source: ImageSource.gallery);
-    }
-    if (file == null || !mounted) return;
+  Future<void> _pickAndPreviewMedia() async {
+    final files = await _imagePicker.pickMultipleMedia();
+    if (files.isEmpty || !mounted) return;
 
-    // Check file size (100 MB limit on web due to in-memory upload)
-    final bytes = await file.length();
-    const maxBytes = 250 * 1024 * 1024; // 250 MB
-    if (bytes > maxBytes && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('File too large. Maximum size is 250 MB.')),
-      );
-      return;
+    const maxBytes = 250 * 1024 * 1024;
+    for (final f in files) {
+      if (await f.length() > maxBytes) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${f.name} is too large (max 250 MB)')),
+        );
+        return;
+      }
     }
 
     final caption = await showModalBottomSheet<String?>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.black,
-      builder: (_) => _MediaPreviewSheet(file: file!, type: type),
+      builder: (_) => _MultiMediaPreviewSheet(files: files),
     );
-
-    if (caption == null) return; // dismissed
+    if (caption == null || !mounted) return;
 
     setState(() => _isUploading = true);
     try {
-      final url = await _storageService.uploadChatMedia(_conversationId, file);
-      final message = Message(
-        id: '',
-        senderId: _currentUserUid,
-        senderRole: 'creator',
-        type: type,
-        content: caption,
-        mediaUrl: url,
-        timestamp: DateTime.now(),
-      );
-      await _firestoreService.sendMessage(
-        _conversationId, message,
-        subscriberUid: widget.subscriberUid,
-        creatorUid: widget.creatorUid,
-      );
-    } on Exception catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      for (final file in files) {
+        final type = _isVideo(file) ? 'video' : 'image';
+        final url = await _storageService.uploadChatMedia(_conversationId, file);
+        final message = Message(
+          id: '',
+          senderId: _currentUserUid,
+          senderRole: 'creator',
+          type: type,
+          content: caption,
+          mediaUrl: url,
+          timestamp: DateTime.now(),
+        );
+        await _firestoreService.sendMessage(
+          _conversationId, message,
+          subscriberUid: widget.subscriberUid,
+          creatorUid: widget.creatorUid,
         );
       }
+    } on Exception catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+  }
+
+  bool _isVideo(XFile file) {
+    final ext = file.name.split('.').last.toLowerCase();
+    return ['mp4', 'mov', 'avi', 'webm', 'mkv', 'm4v'].contains(ext);
   }
 
   bool _canSend() {
@@ -228,8 +228,15 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final otherName = _otherUser?.displayName ?? '...';
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (_) => Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false),
+      child: Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false),
+        ),
         titleSpacing: 0,
         title: Row(
           children: [
@@ -258,6 +265,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _buildInput(),
         ],
       ),
+    ),
     );
   }
 
@@ -303,6 +311,7 @@ class _ChatScreenState extends State<ChatScreen> {
             final msg = messages[index];
             final showDate = index == 0 ||
                 !_sameDay(messages[index - 1].timestamp, msg.timestamp);
+            final showCaption = _shouldShowCaption(messages, index);
 
             return Column(
               children: [
@@ -310,6 +319,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 MessageBubble(
                   message: msg,
                   isMe: msg.senderId == _currentUserUid,
+                  showCaption: showCaption,
                   onMediaTap: msg.isMedia
                       ? () {
                           final mediaIndex = mediaMessages.indexOf(msg);
@@ -347,12 +357,8 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 if (_isCreator) ...[
                   _MediaButton(
-                    icon: Icons.image_outlined,
-                    onTap: _isUploading ? null : () => _pickAndPreviewMedia('image'),
-                  ),
-                  _MediaButton(
-                    icon: Icons.videocam_outlined,
-                    onTap: _isUploading ? null : () => _pickAndPreviewMedia('video'),
+                    icon: Icons.perm_media_outlined,
+                    onTap: _isUploading ? null : _pickAndPreviewMedia,
                   ),
                   const SizedBox(width: 4),
                 ],
@@ -448,6 +454,15 @@ class _ChatScreenState extends State<ChatScreen> {
 bool _sameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
 
+// Show caption only on the first media of a group with the same caption/sender
+bool _shouldShowCaption(List<Message> messages, int i) {
+  final msg = messages[i];
+  if (!msg.isMedia || msg.content.isEmpty) return msg.content.isNotEmpty;
+  if (i == 0) return true;
+  final prev = messages[i - 1];
+  return !(prev.senderId == msg.senderId && prev.content == msg.content && prev.isMedia);
+}
+
 class _DateSeparator extends StatelessWidget {
   final DateTime date;
   const _DateSeparator({required this.date});
@@ -503,59 +518,39 @@ class _MediaButton extends StatelessWidget {
   }
 }
 
-class _MediaPreviewSheet extends StatefulWidget {
-  final XFile file;
-  final String type;
+// ─── Multi-media preview sheet ───────────────────────────────────────────────
 
-  const _MediaPreviewSheet({required this.file, required this.type});
+class _MultiMediaPreviewSheet extends StatefulWidget {
+  final List<XFile> files;
+  const _MultiMediaPreviewSheet({required this.files});
 
   @override
-  State<_MediaPreviewSheet> createState() => _MediaPreviewSheetState();
+  State<_MultiMediaPreviewSheet> createState() => _MultiMediaPreviewSheetState();
 }
 
-class _MediaPreviewSheetState extends State<_MediaPreviewSheet> {
+class _MultiMediaPreviewSheetState extends State<_MultiMediaPreviewSheet> {
   final _captionController = TextEditingController();
-  late Future<Uint8List> _bytesFuture;
-  VideoPlayerController? _videoController;
-  bool _videoInitialized = false;
+  late final PageController _pageController;
+  int _currentPage = 0;
 
   @override
   void initState() {
     super.initState();
-    _bytesFuture = widget.file.readAsBytes();
-    if (widget.type == 'video') {
-      _videoController = VideoPlayerController.networkUrl(Uri.parse(widget.file.path))
-        ..initialize().then((_) {
-          if (mounted) setState(() => _videoInitialized = true);
-        });
-      _videoController!.addListener(() { if (mounted) setState(() {}); });
-    }
+    _pageController = PageController();
   }
 
   @override
   void dispose() {
     _captionController.dispose();
-    _videoController?.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
-  void _toggleVideoPlay() {
-    if (_videoController == null) return;
-    setState(() {
-      _videoController!.value.isPlaying
-          ? _videoController!.pause()
-          : _videoController!.play();
-    });
-  }
-
-  String _formatDuration(Duration d) {
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
+  void _send() => Navigator.of(context).pop(_captionController.text.trim());
 
   @override
   Widget build(BuildContext context) {
+    final count = widget.files.length;
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -570,9 +565,9 @@ class _MediaPreviewSheetState extends State<_MediaPreviewSheet> {
                   onPressed: () => Navigator.of(context).pop(null),
                 ),
                 const Spacer(),
-                const Text(
-                  'Preview',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                Text(
+                  count > 1 ? '${_currentPage + 1} / $count' : 'Preview',
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 const Spacer(),
                 const SizedBox(width: 48),
@@ -580,24 +575,69 @@ class _MediaPreviewSheetState extends State<_MediaPreviewSheet> {
             ),
           ),
 
-          // Media preview
+          // Media PageView with arrows
           Flexible(
-            child: widget.type == 'image'
-                ? FutureBuilder<Uint8List>(
-                    future: _bytesFuture,
-                    builder: (context, snap) {
-                      if (!snap.hasData) {
-                        return const Center(child: CircularProgressIndicator(color: Colors.white));
-                      }
-                      return InteractiveViewer(
-                        child: Center(child: Image.memory(snap.data!, fit: BoxFit.contain)),
-                      );
-                    },
-                  )
-                : _buildVideoPreview(),
+            child: Stack(
+              children: [
+                PageView.builder(
+                  controller: _pageController,
+                  itemCount: count,
+                  onPageChanged: (i) => setState(() => _currentPage = i),
+                  itemBuilder: (_, i) => _MediaPage(file: widget.files[i]),
+                ),
+                if (_currentPage > 0)
+                  Positioned(
+                    left: 8, top: 0, bottom: 0,
+                    child: Center(
+                      child: GestureDetector(
+                        onTap: () => _pageController.previousPage(
+                            duration: const Duration(milliseconds: 250), curve: Curves.easeInOut),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
+                          child: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (_currentPage < count - 1)
+                  Positioned(
+                    right: 8, top: 0, bottom: 0,
+                    child: Center(
+                      child: GestureDetector(
+                        onTap: () => _pageController.nextPage(
+                            duration: const Duration(milliseconds: 250), curve: Curves.easeInOut),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
+                          child: const Icon(Icons.chevron_right, color: Colors.white, size: 28),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
 
-          // Caption input + send button
+          // Dots indicator (only if multiple files)
+          if (count > 1)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(count, (i) => Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: i == _currentPage ? 10 : 6,
+                  height: i == _currentPage ? 10 : 6,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: i == _currentPage ? Colors.white : Colors.white38,
+                  ),
+                )),
+              ),
+            ),
+
+          // Caption + send
           Container(
             color: Colors.black,
             padding: EdgeInsets.only(
@@ -612,7 +652,7 @@ class _MediaPreviewSheetState extends State<_MediaPreviewSheet> {
                       if (event is KeyDownEvent &&
                           event.logicalKey == LogicalKeyboardKey.enter &&
                           !HardwareKeyboard.instance.isShiftPressed) {
-                        Navigator.of(context).pop(_captionController.text.trim());
+                        _send();
                         return KeyEventResult.handled;
                       }
                       return KeyEventResult.ignored;
@@ -621,20 +661,11 @@ class _MediaPreviewSheetState extends State<_MediaPreviewSheet> {
                       controller: _captionController,
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
-                        hintText: 'Add a caption…',
+                        hintText: count > 1 ? 'Add a caption for all…' : 'Add a caption…',
                         hintStyle: TextStyle(color: Colors.grey[500]),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: BorderSide(color: Colors.grey[700]!),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: BorderSide(color: Colors.grey[700]!),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: const BorderSide(color: Colors.white54),
-                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: Colors.grey[700]!)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: Colors.grey[700]!)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: Colors.white54)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       ),
                     ),
@@ -643,10 +674,8 @@ class _MediaPreviewSheetState extends State<_MediaPreviewSheet> {
                 const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.send, color: Colors.white),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.blue[600],
-                  ),
-                  onPressed: () => Navigator.of(context).pop(_captionController.text.trim()),
+                  style: IconButton.styleFrom(backgroundColor: Colors.blue[600]),
+                  onPressed: _send,
                 ),
               ],
             ),
@@ -655,70 +684,78 @@ class _MediaPreviewSheetState extends State<_MediaPreviewSheet> {
       ),
     );
   }
+}
 
-  Widget _buildVideoPreview() {
+// ─── Single media page (image or video) ──────────────────────────────────────
+
+class _MediaPage extends StatefulWidget {
+  final XFile file;
+  const _MediaPage({required this.file});
+
+  @override
+  State<_MediaPage> createState() => _MediaPageState();
+}
+
+class _MediaPageState extends State<_MediaPage> {
+  late Future<Uint8List> _bytesFuture;
+  VideoPlayerController? _videoController;
+  bool _videoInitialized = false;
+  bool get _isVideo {
+    final ext = widget.file.name.split('.').last.toLowerCase();
+    return ['mp4', 'mov', 'avi', 'webm', 'mkv', 'm4v'].contains(ext);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isVideo) {
+      _videoController = VideoPlayerController.networkUrl(Uri.parse(widget.file.path))
+        ..initialize().then((_) { if (mounted) setState(() => _videoInitialized = true); });
+      _videoController!.addListener(() { if (mounted) setState(() {}); });
+    } else {
+      _bytesFuture = widget.file.readAsBytes();
+    }
+  }
+
+  @override
+  void dispose() {
+    _videoController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isVideo) return _buildVideo();
+    return FutureBuilder<Uint8List>(
+      future: _bytesFuture,
+      builder: (_, snap) => snap.hasData
+          ? InteractiveViewer(child: Center(child: Image.memory(snap.data!, fit: BoxFit.contain)))
+          : const Center(child: CircularProgressIndicator(color: Colors.white)),
+    );
+  }
+
+  Widget _buildVideo() {
     final ctrl = _videoController;
     if (ctrl == null || !_videoInitialized) {
       return const Center(child: CircularProgressIndicator(color: Colors.white));
     }
     return GestureDetector(
-      onTap: _toggleVideoPlay,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          AspectRatio(
-            aspectRatio: ctrl.value.aspectRatio,
-            child: VideoPlayer(ctrl),
+      behavior: HitTestBehavior.opaque,
+      onTap: () => setState(() => ctrl.value.isPlaying ? ctrl.pause() : ctrl.play()),
+      child: Stack(alignment: Alignment.center, children: [
+        Center(child: AspectRatio(aspectRatio: ctrl.value.aspectRatio, child: IgnorePointer(child: VideoPlayer(ctrl)))),
+        AnimatedOpacity(
+          opacity: ctrl.value.isPlaying ? 0 : 1,
+          duration: const Duration(milliseconds: 200),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: Colors.black.withAlpha(140), shape: BoxShape.circle),
+            child: const Icon(Icons.play_arrow, color: Colors.white, size: 40),
           ),
-          // Play/pause overlay
-          AnimatedOpacity(
-            opacity: ctrl.value.isPlaying ? 0 : 1,
-            duration: const Duration(milliseconds: 200),
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.black.withAlpha(140),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.play_arrow, color: Colors.white, size: 40),
-            ),
-          ),
-          // Progress bar at bottom
-          Positioned(
-            left: 0, right: 0, bottom: 0,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                VideoProgressIndicator(
-                  ctrl,
-                  allowScrubbing: true,
-                  colors: VideoProgressColors(
-                    playedColor: Colors.white,
-                    bufferedColor: Colors.white38,
-                    backgroundColor: Colors.white12,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  child: Row(
-                    children: [
-                      Text(
-                        _formatDuration(ctrl.value.position),
-                        style: const TextStyle(color: Colors.white70, fontSize: 11),
-                      ),
-                      const Spacer(),
-                      Text(
-                        _formatDuration(ctrl.value.duration),
-                        style: const TextStyle(color: Colors.white70, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+        Positioned(left: 0, right: 0, bottom: 0, child: VideoProgressIndicator(ctrl, allowScrubbing: true,
+          colors: VideoProgressColors(playedColor: Colors.white, bufferedColor: Colors.white38, backgroundColor: Colors.white12))),
+      ]),
     );
   }
 }

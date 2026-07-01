@@ -297,4 +297,53 @@ class FirestoreService {
     final doc = await _db.collection(conversationsCollection).doc(convId).get();
     return doc.exists ? doc.data() : null;
   }
+
+  /// Stream creator conversations sorted by most recent activity (client-side sort)
+  Stream<List<Map<String, dynamic>>> streamCreatorConversationsSorted(String creatorUid) {
+    return _db
+        .collection(conversationsCollection)
+        .where('creatorUid', isEqualTo: creatorUid)
+        .snapshots()
+        .map((s) {
+          final docs = s.docs.map((d) => {'_id': d.id, ...d.data()}).toList();
+          docs.sort((a, b) {
+            final aTs = a['lastMessageAt'] as Timestamp?;
+            final bTs = b['lastMessageAt'] as Timestamp?;
+            if (aTs == null && bTs == null) return 0;
+            if (aTs == null) return 1;
+            if (bTs == null) return -1;
+            return bTs.compareTo(aTs);
+          });
+          return docs;
+        });
+  }
+
+  /// Send a broadcast message to all active subscribers
+  Future<void> broadcastMessage({
+    required String creatorUid,
+    required Message message,
+    void Function(int sent, int total)? onProgress,
+  }) async {
+    final subscSnapshot = await _db
+        .collection(subscriptionsCollection)
+        .where('creatorUid', isEqualTo: creatorUid)
+        .where('status', isEqualTo: 'active')
+        .get();
+
+    final subs = subscSnapshot.docs;
+    final total = subs.length;
+
+    for (var i = 0; i < total; i++) {
+      final data = subs[i].data();
+      final subscriberUid = data['subscriberUid'] as String;
+      final convId = conversationId(subscriberUid, creatorUid);
+      await sendMessage(
+        convId,
+        message,
+        subscriberUid: subscriberUid,
+        creatorUid: creatorUid,
+      );
+      onProgress?.call(i + 1, total);
+    }
+  }
 }
