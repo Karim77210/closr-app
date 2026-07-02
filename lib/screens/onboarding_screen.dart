@@ -40,7 +40,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _bioController = TextEditingController();
   final _priceController = TextEditingController(text: '20');
   final _limitController = TextEditingController(text: '50');
-  final _ibanController = TextEditingController();
   final _messageCharsController = TextEditingController(text: '300');
   final _messageCooldownController = TextEditingController(text: '20');
   final _messageDailyController = TextEditingController(text: '10');
@@ -77,7 +76,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _bioController.dispose();
     _priceController.dispose();
     _limitController.dispose();
-    _ibanController.dispose();
+
     _messageCharsController.dispose();
     _messageCooldownController.dispose();
     _messageDailyController.dispose();
@@ -148,7 +147,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final bio = _bioController.text.trim();
     final price = int.tryParse(_priceController.text.trim()) ?? 0;
     final limit = int.tryParse(_limitController.text.trim()) ?? 0;
-    final iban = _ibanController.text.trim();
     final messageChars = int.tryParse(_messageCharsController.text.trim()) ?? 300;
     final cooldown = int.tryParse(_messageCooldownController.text.trim()) ?? 20;
     final daily = int.tryParse(_messageDailyController.text.trim()) ?? 10;
@@ -181,7 +179,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         bio: bio,
         subscriptionPriceCents: price * 100,
         subscriberLimit: limit,
-        iban: iban,
         messageCharacterLimit: messageChars,
         messageCooldownSeconds: cooldown,
         maxMessagesPerDay: daily,
@@ -320,12 +317,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       label: 'Subscriber limit',
                       hint: 'Default 50',
                       keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _ibanController,
-                      label: 'IBAN for payouts',
-                      hint: 'Optional payout IBAN',
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(

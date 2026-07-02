@@ -343,6 +343,70 @@ export const createStripeLoginLink = functions.https.onRequest((req, res) => {
   });
 });
 
+// ─── Payout helpers ──────────────────────────────────────────────────────────
+
+async function getCreatorGrossCents(creatorUid: string): Promise<number> {
+  const subsSnap = await db.collection('subscriptions')
+    .where('creatorUid', '==', creatorUid)
+    .get();
+
+  const totals = await Promise.all(subsSnap.docs.map(async (doc) => {
+    const sub = doc.data();
+    try {
+      const invoices = await stripe.invoices.list({
+        subscription: sub.stripeSubscriptionId,
+        limit: 100,
+      });
+      return invoices.data
+        .filter(inv => inv.status === 'paid' && inv.amount_paid > 0)
+        .reduce((sum, inv) => sum + inv.amount_paid, 0);
+    } catch (_) {
+      return 0;
+    }
+  }));
+
+  return totals.reduce((a, b) => a + b, 0);
+}
+
+async function getAlreadyPaidOutCents(creatorUid: string): Promise<number> {
+  const snap = await db.collection('payout_requests')
+    .where('creatorUid', '==', creatorUid)
+    .where('status', '==', 'paid')
+    .get();
+
+  return snap.docs.reduce((sum, doc) => sum + (doc.data().amount as number), 0);
+}
+
+async function executeTransfer(
+  creatorUid: string,
+  connectAccountId: string,
+  amountCents: number,
+  trigger: 'manual' | 'auto',
+): Promise<string> {
+  const requestRef = await db.collection('payout_requests').add({
+    creatorUid,
+    amount: amountCents,
+    status: 'pending',
+    trigger,
+    requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  const transfer = await stripe.transfers.create({
+    amount: amountCents,
+    currency: 'eur',
+    destination: connectAccountId,
+    metadata: { creatorUid, payoutRequestId: requestRef.id, trigger },
+  });
+
+  await requestRef.update({
+    status: 'paid',
+    stripeTransferId: transfer.id,
+    processedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return transfer.id;
+}
+
 // ─── Request Payout ──────────────────────────────────────────────────────────
 
 export const requestPayout = functions.https.onRequest((req, res) => {
@@ -356,11 +420,6 @@ export const requestPayout = functions.https.onRequest((req, res) => {
       const decoded = await admin.auth().verifyIdToken(authHeader.split('Bearer ')[1]);
       const creatorUid = decoded.uid;
 
-      const { amountCents } = req.body as { amountCents: number };
-      if (!amountCents || amountCents <= 0) {
-        res.status(400).json({ error: 'Invalid amount' }); return;
-      }
-
       const userDoc = await db.collection('users').doc(creatorUid).get();
       const user = userDoc.data()!;
       const connectAccountId = user.stripeConnectAccountId as string | undefined;
@@ -369,32 +428,61 @@ export const requestPayout = functions.https.onRequest((req, res) => {
         res.status(400).json({ error: 'Stripe Connect account not configured' }); return;
       }
 
-      // Create Firestore payout_request doc first
-      const requestRef = await db.collection('payout_requests').add({
-        creatorUid,
-        amount: amountCents,
-        status: 'pending',
-        requestedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      const grossCents = await getCreatorGrossCents(creatorUid);
+      const netCents = Math.round(grossCents * 0.85);
+      const alreadyPaid = await getAlreadyPaidOutCents(creatorUid);
+      const available = netCents - alreadyPaid;
 
-      // Transfer from platform to creator's Connect account
-      const transfer = await stripe.transfers.create({
-        amount: amountCents,
-        currency: 'eur',
-        destination: connectAccountId,
-        metadata: { creatorUid, payoutRequestId: requestRef.id },
-      });
+      if (available <= 0) {
+        res.status(400).json({ error: 'No balance available to pay out' }); return;
+      }
 
-      await requestRef.update({
-        status: 'paid',
-        stripeTransferId: transfer.id,
-        processedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      res.json({ success: true, transferId: transfer.id });
+      const transferId = await executeTransfer(creatorUid, connectAccountId, available, 'manual');
+      res.json({ success: true, transferId, amountCents: available });
     } catch (err) {
       console.error('requestPayout error:', err);
       res.status(500).json({ error: String(err) });
     }
   });
 });
+
+// ─── Monthly Auto Payout (runs on the 1st of each month at 09:00 Paris time) ─
+
+export const monthlyAutoPayout = functions.pubsub
+  .schedule('0 9 1 * *')
+  .timeZone('Europe/Paris')
+  .onRun(async () => {
+    const creatorsSnap = await db.collection('users')
+      .where('autoPayoutEnabled', '==', true)
+      .where('stripeConnectOnboarded', '==', true)
+      .get();
+
+    if (creatorsSnap.empty) {
+      console.log('monthlyAutoPayout: no eligible creators');
+      return;
+    }
+
+    const results = await Promise.allSettled(creatorsSnap.docs.map(async (doc) => {
+      const creator = doc.data();
+      const creatorUid = creator.uid as string;
+      const connectAccountId = creator.stripeConnectAccountId as string;
+
+      const grossCents = await getCreatorGrossCents(creatorUid);
+      const netCents = Math.round(grossCents * 0.85);
+      const alreadyPaid = await getAlreadyPaidOutCents(creatorUid);
+      const available = netCents - alreadyPaid;
+
+      if (available < 100) {
+        console.log(`monthlyAutoPayout: skipping ${creatorUid} — available ${available}¢ below minimum`);
+        return;
+      }
+
+      const transferId = await executeTransfer(creatorUid, connectAccountId, available, 'auto');
+      console.log(`monthlyAutoPayout: transferred ${available}¢ to ${creatorUid} (${transferId})`);
+    }));
+
+    const failed = results.filter(r => r.status === 'rejected');
+    if (failed.length > 0) {
+      failed.forEach(r => console.error('monthlyAutoPayout error:', (r as PromiseRejectedResult).reason));
+    }
+  });

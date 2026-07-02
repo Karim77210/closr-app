@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/auth_service.dart';
 import 'package:closr_app/services/firestore_service.dart';
+import 'package:closr_app/services/stripe_service.dart';
 import 'package:closr_app/screens/creator_settings_screen.dart';
 import 'package:closr_app/screens/wallet_screen.dart';
 
@@ -18,6 +20,47 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _authService = AuthService();
+  final _firestoreService = FirestoreService();
+  final _stripeService = StripeService();
+
+  late AppUser _user;
+  StreamSubscription<AppUser?>? _userSub;
+
+  int? _balanceCents;
+  bool _balanceLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _user = widget.user;
+    _userSub = _firestoreService.streamUser(_user.uid).listen((u) {
+      if (u == null || !mounted) return;
+      setState(() => _user = u);
+    });
+    if (_user.role == UserRole.creator) _loadBalance();
+  }
+
+  Future<void> _loadBalance() async {
+    try {
+      final data = await _stripeService.getCreatorEarnings();
+      final subs = (data['subscribers'] as List).cast<Map<String, dynamic>>();
+      int grossCents = 0;
+      for (final sub in subs) {
+        for (final inv in (sub['invoices'] as List).cast<Map<String, dynamic>>()) {
+          grossCents += inv['amountPaid'] as int;
+        }
+      }
+      if (mounted) setState(() { _balanceCents = (grossCents * 0.85).round(); _balanceLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _balanceLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _userSub?.cancel();
+    super.dispose();
+  }
 
   void _handleSignOut() {
     showDialog(
@@ -79,12 +122,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       CircleAvatar(
                         radius: 40,
                         backgroundColor: Colors.blue[100],
-                        backgroundImage: widget.user.photoUrl != null && widget.user.photoUrl!.isNotEmpty
-                            ? NetworkImage(widget.user.photoUrl!) as ImageProvider
+                        backgroundImage: _user.photoUrl != null && _user.photoUrl!.isNotEmpty
+                            ? NetworkImage(_user.photoUrl!) as ImageProvider
                             : null,
-                        child: widget.user.photoUrl == null || widget.user.photoUrl!.isEmpty
+                        child: _user.photoUrl == null || _user.photoUrl!.isEmpty
                             ? Text(
-                                widget.user.displayName.substring(0, 1).toUpperCase(),
+                                _user.displayName.substring(0, 1).toUpperCase(),
                                 style: TextStyle(
                                   fontSize: 32,
                                   fontWeight: FontWeight.bold,
@@ -95,14 +138,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        widget.user.displayName,
+                        _user.displayName,
                         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '@${widget.user.username}',
+                        '@${_user.username}',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: Colors.grey[600],
                             ),
@@ -131,16 +174,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                         ),
                         const SizedBox(height: 16),
-                        _buildInfoRow('Email', widget.user.email),
+                        _buildInfoRow('Email', _user.email),
                         const SizedBox(height: 12),
                         _buildInfoRow(
                           'Member Since',
-                          _formatDate(widget.user.createdAt),
+                          _formatDate(_user.createdAt),
                         ),
                         const SizedBox(height: 12),
                         _buildInfoRow(
                           'Status',
-                          widget.user.isActive ? 'Active' : 'Inactive',
+                          _user.isActive ? 'Active' : 'Inactive',
                         ),
                       ],
                     ),
@@ -149,7 +192,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 24),
 
                 // Wallet card — creators only
-                if (widget.user.role == UserRole.creator) ...[
+                if (_user.role == UserRole.creator) ...[
                   _buildWalletCard(context),
                   const SizedBox(height: 32),
                 ] else
@@ -169,7 +212,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   title: 'Edit Profile',
                   subtitle: 'Update your name and photo',
                   onTap: () {
-                    if (widget.user.role == UserRole.creator) {
+                    if (_user.role == UserRole.creator) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -183,7 +226,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                if (widget.user.role == UserRole.subscriber) ...[
+                if (_user.role == UserRole.subscriber) ...[
                   _buildSettingsTile(
                     icon: Icons.star_outline,
                     title: 'Become a Creator',
@@ -193,7 +236,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 12),
                 ],
 
-                if (widget.user.role == UserRole.creator)
+                if (_user.role == UserRole.creator)
                   Column(
                     children: [
                       _buildSettingsTile(
@@ -342,6 +385,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildWalletCard(BuildContext context) {
+    String balanceText;
+    if (_balanceLoading) {
+      balanceText = '€ …';
+    } else if (_balanceCents == null) {
+      balanceText = '€ ?';
+    } else {
+      balanceText = '€ ${(_balanceCents! / 100).toStringAsFixed(2)}';
+    }
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -360,7 +412,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '€ ···',
+                  balanceText,
                   style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
                 ),
               ],
@@ -368,7 +420,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           OutlinedButton(
             onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => WalletScreen(creator: widget.user)),
+              MaterialPageRoute(builder: (_) => WalletScreen(creator: _user)),
             ),
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: Colors.white54),

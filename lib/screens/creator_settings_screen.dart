@@ -23,7 +23,6 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
   final _bioController = TextEditingController();
   final _priceController = TextEditingController();
   final _limitController = TextEditingController();
-  final _ibanController = TextEditingController();
   final _messageCharsController = TextEditingController();
   final _messageCooldownController = TextEditingController();
   final _messageDailyController = TextEditingController();
@@ -41,7 +40,6 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
     _bioController.text = widget.user.bio;
     _priceController.text = (widget.user.subscriptionPriceCents / 100).toStringAsFixed(0);
     _limitController.text = widget.user.subscriberLimit > 0 ? widget.user.subscriberLimit.toString() : '50';
-    _ibanController.text = widget.user.iban;
     _messageCharsController.text = widget.user.messageCharacterLimit.toString();
     _messageCooldownController.text = widget.user.messageCooldownSeconds.toString();
     _messageDailyController.text = widget.user.maxMessagesPerDay.toString();
@@ -54,7 +52,6 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
     _bioController.dispose();
     _priceController.dispose();
     _limitController.dispose();
-    _ibanController.dispose();
     _messageCharsController.dispose();
     _messageCooldownController.dispose();
     _messageDailyController.dispose();
@@ -83,7 +80,6 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
     final bio = _bioController.text.trim();
     final price = int.tryParse(_priceController.text.trim()) ?? 0;
     final limit = int.tryParse(_limitController.text.trim()) ?? 0;
-    final iban = _ibanController.text.trim();
     final messageChars = int.tryParse(_messageCharsController.text.trim()) ?? 300;
     final cooldown = int.tryParse(_messageCooldownController.text.trim()) ?? 20;
     final daily = int.tryParse(_messageDailyController.text.trim()) ?? 10;
@@ -118,7 +114,6 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
         bio: bio,
         subscriptionPriceCents: price * 100,
         subscriberLimit: limit,
-        iban: iban,
         messageCharacterLimit: messageChars,
         messageCooldownSeconds: cooldown,
         maxMessagesPerDay: daily,
@@ -198,12 +193,6 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
                     label: 'Subscriber limit',
                     hint: 'Suggested 50',
                     keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    controller: _ibanController,
-                    label: 'IBAN for payouts',
-                    hint: 'Enter your IBAN',
                   ),
                   const SizedBox(height: 16),
                   _buildTextField(

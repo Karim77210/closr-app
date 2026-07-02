@@ -13,7 +13,6 @@ class AppUser {
   final int subscriptionPriceCents;
   final int subscriberLimit;
   final int subscriberCount;
-  final String iban;
   final int messageCharacterLimit;
   final int messageCooldownSeconds;
   final int maxMessagesPerDay;
@@ -37,7 +36,6 @@ class AppUser {
     this.subscriptionPriceCents = 0,
     this.subscriberLimit = 0,
     this.subscriberCount = 0,
-    this.iban = '',
     this.messageCharacterLimit = 300,
     this.messageCooldownSeconds = 20,
     this.maxMessagesPerDay = 10,
@@ -64,7 +62,6 @@ class AppUser {
       'subscriptionPriceCents': subscriptionPriceCents,
       'subscriberLimit': subscriberLimit,
       'subscriberCount': subscriberCount,
-      'iban': iban,
       'messageCharacterLimit': messageCharacterLimit,
       'messageCooldownSeconds': messageCooldownSeconds,
       'maxMessagesPerDay': maxMessagesPerDay,
@@ -92,7 +89,6 @@ class AppUser {
       subscriptionPriceCents: json['subscriptionPriceCents'] as int? ?? 0,
       subscriberLimit: json['subscriberLimit'] as int? ?? 0,
       subscriberCount: json['subscriberCount'] as int? ?? 0,
-      iban: json['iban'] as String? ?? '',
       messageCharacterLimit: json['messageCharacterLimit'] as int? ?? 300,
       messageCooldownSeconds: json['messageCooldownSeconds'] as int? ?? 20,
       maxMessagesPerDay: json['maxMessagesPerDay'] as int? ?? 10,
@@ -119,7 +115,6 @@ class AppUser {
     int? subscriptionPriceCents,
     int? subscriberLimit,
     int? subscriberCount,
-    String? iban,
     int? messageCharacterLimit,
     int? messageCooldownSeconds,
     int? maxMessagesPerDay,
@@ -140,7 +135,6 @@ class AppUser {
       subscriptionPriceCents: subscriptionPriceCents ?? this.subscriptionPriceCents,
       subscriberLimit: subscriberLimit ?? this.subscriberLimit,
       subscriberCount: subscriberCount ?? this.subscriberCount,
-      iban: iban ?? this.iban,
       messageCharacterLimit: messageCharacterLimit ?? this.messageCharacterLimit,
       messageCooldownSeconds: messageCooldownSeconds ?? this.messageCooldownSeconds,
       maxMessagesPerDay: maxMessagesPerDay ?? this.maxMessagesPerDay,

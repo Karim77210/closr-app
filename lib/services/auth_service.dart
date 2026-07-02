@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
@@ -106,7 +107,6 @@ class AuthService {
     String? bio,
     int? subscriptionPriceCents,
     int? subscriberLimit,
-    String? iban,
     int? messageCharacterLimit,
     int? messageCooldownSeconds,
     int? maxMessagesPerDay,
@@ -137,7 +137,6 @@ class AuthService {
       subscriptionPriceCents: subscriptionPriceCents ?? 0,
       subscriberLimit: subscriberLimit ?? 0,
       subscriberCount: 0,
-      iban: iban ?? '',
       messageCharacterLimit: messageCharacterLimit ?? 300,
       messageCooldownSeconds: messageCooldownSeconds ?? 20,
       maxMessagesPerDay: maxMessagesPerDay ?? 10,
@@ -155,21 +154,19 @@ class AuthService {
     String? bio,
     int? subscriptionPriceCents,
     int? subscriberLimit,
-    String? iban,
     int? messageCharacterLimit,
     int? messageCooldownSeconds,
     int? maxMessagesPerDay,
     XFile? photoFile,
   }) async {
     final updateData = <String, dynamic>{
-      'updatedAt': DateTime.now(),
+      'updatedAt': FieldValue.serverTimestamp(),
     };
 
     if (displayName != null) updateData['displayName'] = displayName;
     if (bio != null) updateData['bio'] = bio;
     if (subscriptionPriceCents != null) updateData['subscriptionPriceCents'] = subscriptionPriceCents;
     if (subscriberLimit != null) updateData['subscriberLimit'] = subscriberLimit;
-    if (iban != null) updateData['iban'] = iban;
     if (messageCharacterLimit != null) updateData['messageCharacterLimit'] = messageCharacterLimit;
     if (messageCooldownSeconds != null) updateData['messageCooldownSeconds'] = messageCooldownSeconds;
     if (maxMessagesPerDay != null) updateData['maxMessagesPerDay'] = maxMessagesPerDay;

@@ -50,16 +50,17 @@ class StripeService {
     return body['url'] as String;
   }
 
-  /// Request a payout of [amountCents] to the creator's Stripe Connect account.
-  Future<void> requestPayout(int amountCents) async {
+  /// Request a payout to the creator's Stripe Connect account.
+  /// Returns the amount actually transferred in cents.
+  Future<int> requestPayout() async {
     final token = await _authToken();
     final response = await http.post(
       Uri.parse('$_base/requestPayout'),
       headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
-      body: jsonEncode({'amountCents': amountCents}),
     );
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode != 200) throw Exception(body['error'] ?? 'Payout failed');
+    return body['amountCents'] as int;
   }
 
   /// Open the Stripe Express dashboard for the connected account.

@@ -31,13 +31,29 @@ class _WalletScreenState extends State<WalletScreen> {
   bool _payoutLoading = false;
   bool _connectLoading = false;
 
+  StreamSubscription<AppUser?>? _userSub;
+
   @override
   void initState() {
     super.initState();
     _autoPayoutEnabled = widget.creator.autoPayoutEnabled;
     _stripeConnectOnboarded = widget.creator.stripeConnectOnboarded;
     _stripeConnectAccountId = widget.creator.stripeConnectAccountId;
+    _userSub = _firestoreService.streamUser(widget.creator.uid).listen((user) {
+      if (user == null || !mounted) return;
+      setState(() {
+        _autoPayoutEnabled = user.autoPayoutEnabled;
+        _stripeConnectOnboarded = user.stripeConnectOnboarded;
+        _stripeConnectAccountId = user.stripeConnectAccountId;
+      });
+    });
     _loadEarnings();
+  }
+
+  @override
+  void dispose() {
+    _userSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadEarnings() async {
@@ -156,18 +172,11 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Future<void> _handleRequestPayout() async {
-    if (_totalNetAllTime <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No balance available to pay out')),
-      );
-      return;
-    }
-
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Request Payout'),
-        content: Text('Transfer ${_fmt(_totalNetAllTime)} to your connected bank account?'),
+        content: const Text('Transfer your available balance to your connected bank account?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm')),
@@ -178,9 +187,9 @@ class _WalletScreenState extends State<WalletScreen> {
 
     setState(() => _payoutLoading = true);
     try {
-      await _stripeService.requestPayout(_totalNetAllTime);
+      final amountCents = await _stripeService.requestPayout();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Payout of ${_fmt(_totalNetAllTime)} initiated!')),
+        SnackBar(content: Text('Payout of ${_fmt(amountCents)} initiated!')),
       );
     } on Exception catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
@@ -359,11 +368,6 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildPayoutSettings() {
-    final iban = widget.creator.iban;
-    final maskedIban = iban.isNotEmpty && iban.length > 8
-        ? '${iban.substring(0, 4)} •••• ${iban.substring(iban.length - 4)}'
-        : iban.isNotEmpty ? iban : 'No IBAN registered';
-
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -386,9 +390,16 @@ class _WalletScreenState extends State<WalletScreen> {
           const Divider(height: 20),
           Row(
             children: [
-              const Icon(Icons.account_balance_outlined, size: 18, color: Colors.grey),
+              Icon(Icons.account_balance_outlined, size: 18, color: Colors.grey[500]),
               const SizedBox(width: 8),
-              Expanded(child: Text(maskedIban, style: const TextStyle(fontSize: 13))),
+              Expanded(
+                child: Text(
+                  _stripeConnectOnboarded
+                      ? 'Payments sent to your Stripe Connect bank account'
+                      : 'Connect your Stripe account to receive payouts',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
