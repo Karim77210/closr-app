@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:video_player/video_player.dart';
 import 'package:closr_app/models/message_model.dart';
+import 'package:closr_app/theme.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -11,8 +12,24 @@ class MessageBubble extends StatelessWidget {
 
   const MessageBubble({Key? key, required this.message, required this.isMe, this.showCaption = true, this.onMediaTap}) : super(key: key);
 
+  BorderRadius _bubbleRadius() {
+    // Outgoing (isMe): (20,20,20,6) · Incoming: (20,20,6,20)
+    return BorderRadius.only(
+      topLeft: const Radius.circular(20),
+      topRight: const Radius.circular(20),
+      bottomLeft: Radius.circular(isMe ? 20 : 6),
+      bottomRight: Radius.circular(isMe ? 6 : 20),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    // Incoming bubble surface: cream (light) / plum surface (dark)
+    final incomingColor = isDark ? theme.colorScheme.surface : ClosrColors.cream;
+    final radius = _bubbleRadius();
+
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -23,21 +40,11 @@ class MessageBubble extends StatelessWidget {
           right: isMe ? 12 : 64,
         ),
         decoration: BoxDecoration(
-          color: isMe ? Colors.blue[600] : Colors.grey[100],
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(isMe ? 16 : 4),
-            bottomRight: Radius.circular(isMe ? 4 : 16),
-          ),
+          color: isMe ? ClosrColors.ember : incomingColor,
+          borderRadius: radius,
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(isMe ? 16 : 4),
-            bottomRight: Radius.circular(isMe ? 4 : 16),
-          ),
+          borderRadius: radius,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -49,7 +56,9 @@ class MessageBubble extends StatelessWidget {
                   DateFormat('HH:mm').format(message.timestamp),
                   style: TextStyle(
                     fontSize: 10,
-                    color: isMe ? Colors.white60 : Colors.grey[500],
+                    color: isMe
+                        ? ClosrColors.paper.withAlpha(180)
+                        : theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -61,6 +70,8 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildContent(BuildContext context) {
+    final theme = Theme.of(context);
+    final textColor = isMe ? ClosrColors.paper : theme.colorScheme.onSurface;
     switch (message.type) {
       case 'image':
         return GestureDetector(
@@ -74,7 +85,7 @@ class MessageBubble extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
                   child: Text(message.content,
-                      style: TextStyle(color: isMe ? Colors.white : Colors.black87, fontSize: 14)),
+                      style: TextStyle(color: textColor, fontSize: 14)),
                 ),
             ],
           ),
@@ -92,7 +103,7 @@ class MessageBubble extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
                   child: Text(message.content,
-                      style: TextStyle(color: isMe ? Colors.white : Colors.black87, fontSize: 14)),
+                      style: TextStyle(color: textColor, fontSize: 14)),
                 ),
             ],
           ),
@@ -102,7 +113,7 @@ class MessageBubble extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Text(
             message.content,
-            style: TextStyle(color: isMe ? Colors.white : Colors.black87, fontSize: 15),
+            style: TextStyle(color: textColor, fontSize: 15),
           ),
         );
     }
@@ -128,9 +139,9 @@ class _ImageMessage extends StatelessWidget {
                 width: 200, height: 150,
                 child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
               ),
-        errorBuilder: (_, __, ___) => const SizedBox(
+        errorBuilder: (_, __, ___) => SizedBox(
           width: 80, height: 80,
-          child: Center(child: Icon(Icons.broken_image, size: 40, color: Colors.grey)),
+          child: Center(child: Icon(Icons.broken_image, size: 40, color: ClosrColors.muted)),
         ),
       ),
     );
@@ -180,12 +191,12 @@ class _VideoMessageState extends State<_VideoMessage> {
                 ),
                 // Thumbnail overlay — tap handled by parent GestureDetector
                 Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withAlpha(60),
+                  decoration: const BoxDecoration(
+                    color: ClosrColors.ink,
                     shape: BoxShape.circle,
                   ),
                   padding: const EdgeInsets.all(14),
-                  child: const Icon(Icons.play_arrow, color: Colors.white, size: 36),
+                  child: const Icon(Icons.play_arrow, color: ClosrColors.paper, size: 36),
                 ),
               ],
             )

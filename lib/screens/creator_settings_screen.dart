@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/auth_service.dart';
 import 'package:closr_app/widgets/loading_overlay.dart';
+import 'package:closr_app/theme.dart';
 
 class CreatorSettingsScreen extends StatefulWidget {
   final AppUser user;
@@ -222,13 +223,13 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.red[50],
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.red[200]!),
+                            color: ClosrColors.rose.withAlpha(28),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: ClosrColors.rose.withAlpha(90)),
                           ),
                           child: Text(
                             _errorMessage!,
-                            style: const TextStyle(color: Colors.red),
+                            style: const TextStyle(color: ClosrColors.rose),
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -238,7 +239,6 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
                     onPressed: _isLoading ? null : _saveSettings,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     child: const Text('Save Creator Settings'),
                   ),
@@ -258,17 +258,17 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.grey[300]!),
-          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Theme.of(context).colorScheme.outline),
+          color: Theme.of(context).colorScheme.surface,
         ),
         child: Row(
           children: [
             CircleAvatar(
               radius: 30,
-              backgroundColor: Colors.blue[100],
+              backgroundColor: ClosrColors.emberSoft,
               backgroundImage: imageProvider,
-              child: imageProvider == null ? const Icon(Icons.camera_alt_outlined, color: Colors.white) : null,
+              child: imageProvider == null ? const Icon(Icons.camera_alt_outlined, color: ClosrColors.ink) : null,
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -281,7 +281,7 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
                 ],
               ),
             ),
-            const Icon(Icons.edit, color: Colors.blue),
+            const Icon(Icons.edit, color: ClosrColors.ember),
           ],
         ),
       ),
@@ -304,7 +304,6 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }

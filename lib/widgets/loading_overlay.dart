@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:closr_app/theme.dart';
 
 class LoadingOverlay extends StatelessWidget {
   final Widget child;
@@ -20,22 +21,20 @@ class LoadingOverlay extends StatelessWidget {
         if (isLoading)
           Positioned.fill(
             child: Container(
-              color: Colors.black.withAlpha((0.3 * 255).round()),
+              color: ClosrColors.plum.withAlpha((0.45 * 255).round()),
               child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Colors.blue[600]!,
-                      ),
+                    const CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(ClosrColors.ember),
                     ),
                     if (message != null) ...[
                       const SizedBox(height: 16),
                       Text(
                         message!,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.white,
+                              color: ClosrColors.paper,
                               fontWeight: FontWeight.w500,
                             ),
                       ),

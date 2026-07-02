@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:closr_app/theme.dart';
 
 class SubscriptionSuccessScreen extends StatelessWidget {
   final String creatorUsername;
@@ -20,10 +21,10 @@ class SubscriptionSuccessScreen extends StatelessWidget {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: Colors.green[50],
+                    color: ClosrColors.green.withAlpha(30),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.check_circle_outline, size: 48, color: Colors.green[600]),
+                  child: const Icon(Icons.check_circle_outline, size: 48, color: ClosrColors.green),
                 ),
                 const SizedBox(height: 24),
                 Text(
@@ -37,7 +38,7 @@ class SubscriptionSuccessScreen extends StatelessWidget {
                   'You can now chat with $creatorUsername.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Colors.grey[600],
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                 ),
                 const SizedBox(height: 40),
@@ -49,8 +50,7 @@ class SubscriptionSuccessScreen extends StatelessWidget {
                       (_) => false,
                     ),
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                     child: const Text('Go to my chats', style: TextStyle(fontSize: 16)),
                   ),

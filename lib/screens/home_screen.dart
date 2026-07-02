@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:closr_app/models/user_model.dart';
+import 'package:closr_app/theme.dart';
 import 'discussions_screen.dart';
 import 'profile_screen.dart';
 
@@ -25,24 +26,31 @@ class HomeScreen extends StatelessWidget {
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => ProfileScreen(user: user)),
               ),
-              child: CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.blue[100],
-                backgroundImage: user.photoUrl != null && user.photoUrl!.isNotEmpty
-                    ? NetworkImage(user.photoUrl!) as ImageProvider
-                    : null,
-                child: user.photoUrl == null || user.photoUrl!.isEmpty
-                    ? Text(
-                        user.displayName.isNotEmpty
-                            ? user.displayName[0].toUpperCase()
-                            : '?',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue[700],
-                        ),
-                      )
-                    : null,
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: ClosrColors.ember, width: 2),
+                ),
+                padding: const EdgeInsets.all(2),
+                child: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: ClosrColors.emberSoft,
+                  backgroundImage: user.photoUrl != null && user.photoUrl!.isNotEmpty
+                      ? NetworkImage(user.photoUrl!) as ImageProvider
+                      : null,
+                  child: user.photoUrl == null || user.photoUrl!.isEmpty
+                      ? Text(
+                          user.displayName.isNotEmpty
+                              ? user.displayName[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: ClosrColors.ink,
+                          ),
+                        )
+                      : null,
+                ),
               ),
             ),
           ),

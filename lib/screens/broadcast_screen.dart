@@ -8,6 +8,7 @@ import 'package:closr_app/models/message_model.dart';
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/firestore_service.dart';
 import 'package:closr_app/services/storage_service.dart';
+import 'package:closr_app/theme.dart';
 
 class BroadcastScreen extends StatefulWidget {
   final AppUser creator;
@@ -136,14 +137,14 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Broadcast'),
-        elevation: 1,
+        elevation: 0,
         actions: [
           if (_isSending)
             Padding(
               padding: const EdgeInsets.all(12),
               child: Text(
                 '$_sentCount / $_totalCount',
-                style: TextStyle(color: Colors.blue[600], fontWeight: FontWeight.bold),
+                style: const TextStyle(color: ClosrColors.ember, fontWeight: FontWeight.bold),
               ),
             )
           else
@@ -166,7 +167,7 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
                     _isUploading
                         ? 'Uploading media…'
                         : 'Sending to $_sentCount / $_totalCount subscribers…',
-                    style: TextStyle(color: Colors.grey[600]),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -179,15 +180,15 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
                 // Recipient badge
                 Container(
                   width: double.infinity,
-                  color: Colors.blue[50],
+                  color: ClosrColors.emberSoft.withAlpha(90),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Row(
-                    children: [
-                      Icon(Icons.group_outlined, size: 18, color: Colors.blue[700]),
-                      const SizedBox(width: 8),
+                    children: const [
+                      Icon(Icons.group_outlined, size: 18, color: ClosrColors.ember),
+                      SizedBox(width: 8),
                       Text(
                         'All active subscribers',
-                        style: TextStyle(color: Colors.blue[700], fontWeight: FontWeight.w500, fontSize: 13),
+                        style: TextStyle(color: ClosrColors.ember, fontWeight: FontWeight.w500, fontSize: 13),
                       ),
                     ],
                   ),
@@ -227,20 +228,20 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      border: Border(top: BorderSide(color: Colors.grey[200]!)),
+                      border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outline)),
                     ),
                     child: Row(
                       children: [
                         IconButton(
                           icon: const Icon(Icons.perm_media_outlined),
-                          color: Colors.grey[700],
+                          color: ClosrColors.ember,
                           onPressed: _pickMedia,
                           tooltip: 'Add photos / videos',
                         ),
                         if (_mediaFiles.isNotEmpty)
                           Text(
                             '${_mediaFiles.length} file${_mediaFiles.length > 1 ? 's' : ''} selected',
-                            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                            style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
                           ),
                       ],
                     ),

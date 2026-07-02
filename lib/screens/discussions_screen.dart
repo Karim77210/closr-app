@@ -5,6 +5,7 @@ import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/firestore_service.dart';
 import 'package:closr_app/screens/broadcast_screen.dart';
 import 'package:closr_app/screens/chat_screen.dart';
+import 'package:closr_app/theme.dart';
 import 'package:intl/intl.dart';
 
 class DiscussionsScreen extends StatelessWidget {
@@ -177,15 +178,16 @@ class _CreatorConversationTile extends StatelessWidget {
         final name = snap.data?.displayName ?? '...';
         final photoUrl = snap.data?.photoUrl;
 
+        final scheme = Theme.of(context).colorScheme;
         return ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           leading: CircleAvatar(
             radius: 26,
-            backgroundColor: Colors.blue[100],
+            backgroundColor: ClosrColors.emberSoft,
             backgroundImage: photoUrl != null ? NetworkImage(photoUrl) as ImageProvider : null,
             child: photoUrl == null
                 ? Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                    style: const TextStyle(color: ClosrColors.ink, fontWeight: FontWeight.bold))
                 : null,
           ),
           title: Text(name,
@@ -195,7 +197,7 @@ class _CreatorConversationTile extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: hasUnread ? Colors.black87 : Colors.grey[600],
+              color: hasUnread ? scheme.onSurface : scheme.onSurfaceVariant,
               fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
               fontSize: 13,
             ),
@@ -207,7 +209,7 @@ class _CreatorConversationTile extends StatelessWidget {
               if (timeLabel != null)
                 Text(timeLabel,
                     style: TextStyle(
-                      color: hasUnread ? Colors.blue[600] : Colors.grey[500],
+                      color: hasUnread ? ClosrColors.ember : scheme.onSurfaceVariant,
                       fontSize: 12,
                       fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
                     )),
@@ -216,11 +218,11 @@ class _CreatorConversationTile extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.blue[600], borderRadius: BorderRadius.circular(10),
+                    color: ClosrColors.ember, borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
                     unreadCount > 99 ? '99+' : '$unreadCount',
-                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    style: const TextStyle(color: ClosrColors.paper, fontSize: 11, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -281,15 +283,16 @@ class _ConversationTile extends StatelessWidget {
               } catch (_) {}
             }
 
+            final scheme = Theme.of(context).colorScheme;
             return ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               leading: CircleAvatar(
                 radius: 26,
-                backgroundColor: Colors.blue[100],
+                backgroundColor: ClosrColors.emberSoft,
                 backgroundImage: photoUrl != null ? NetworkImage(photoUrl) as ImageProvider : null,
                 child: photoUrl == null
                     ? Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                        style: const TextStyle(color: ClosrColors.ink, fontWeight: FontWeight.bold))
                     : null,
               ),
               title: Text(name,
@@ -299,7 +302,7 @@ class _ConversationTile extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: hasUnread ? Colors.black87 : Colors.grey[600],
+                  color: hasUnread ? scheme.onSurface : scheme.onSurfaceVariant,
                   fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
                   fontSize: 13,
                 ),
@@ -311,7 +314,7 @@ class _ConversationTile extends StatelessWidget {
                   if (timeLabel != null)
                     Text(timeLabel,
                         style: TextStyle(
-                          color: hasUnread ? Colors.blue[600] : Colors.grey[500],
+                          color: hasUnread ? ClosrColors.ember : scheme.onSurfaceVariant,
                           fontSize: 12,
                           fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
                         )),
@@ -320,11 +323,11 @@ class _ConversationTile extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.blue[600], borderRadius: BorderRadius.circular(10),
+                        color: ClosrColors.ember, borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
                         unreadCount > 99 ? '99+' : '$unreadCount',
-                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                        style: const TextStyle(color: ClosrColors.paper, fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
@@ -349,14 +352,14 @@ Widget _buildEmpty(BuildContext context, bool isCreator) {
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.chat_outlined, size: 64, color: Colors.grey[300]),
+        Icon(Icons.chat_outlined, size: 64, color: ClosrColors.emberSoft),
         const SizedBox(height: 16),
         Text('No discussions yet',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey[600])),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
         const SizedBox(height: 8),
         Text(
           isCreator ? 'Your subscribers will appear here' : 'Subscribe to a creator to start chatting',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[500]),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       ],
     ),

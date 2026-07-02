@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/stripe_service.dart';
 import 'package:closr_app/services/firestore_service.dart';
+import 'package:closr_app/theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class WalletScreen extends StatefulWidget {
@@ -203,12 +204,9 @@ class _WalletScreenState extends State<WalletScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text('Wallet', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.grey[50],
         elevation: 0,
-        foregroundColor: Colors.black87,
       ),
       body: RefreshIndicator(
         onRefresh: _loadEarnings,
@@ -251,7 +249,7 @@ class _WalletScreenState extends State<WalletScreen> {
               IconButton(
                 icon: Icon(Icons.chevron_right,
                     color: _selectedMonth.month == DateTime.now().month && _selectedMonth.year == DateTime.now().year
-                        ? Colors.grey[300]
+                        ? Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(90)
                         : null),
                 onPressed: _nextMonth,
                 padding: EdgeInsets.zero,
@@ -264,15 +262,15 @@ class _WalletScreenState extends State<WalletScreen> {
             const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
           else if (_earningsError != null)
             Center(child: Column(children: [
-              Text(_earningsError!, style: TextStyle(color: Colors.red[700], fontSize: 13)),
+              Text(_earningsError!, style: const TextStyle(color: ClosrColors.rose, fontSize: 13)),
               TextButton(onPressed: _loadEarnings, child: const Text('Retry')),
             ]))
           else ...[
             _earningsRow('Gross earnings', _fmt(_grossCents), isBold: false),
             const SizedBox(height: 8),
-            _earningsRow('Commission (-15%)', '-${_fmt(_commissionCents)}', color: Colors.red[600]),
+            _earningsRow('Commission (-15%)', '-${_fmt(_commissionCents)}', color: ClosrColors.rose),
             const Divider(height: 20),
-            _earningsRow('Net balance', _fmt(_netCents), isBold: true, color: Colors.green[700]),
+            _earningsRow('Net balance', _fmt(_netCents), isBold: true, color: ClosrColors.ember),
           ],
         ],
       ),
@@ -283,13 +281,13 @@ class _WalletScreenState extends State<WalletScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[700])),
+        Text(label, style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant)),
         Text(
           value,
           style: TextStyle(
             fontSize: isBold ? 18 : 14,
             fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
-            color: color ?? Colors.black87,
+            color: color ?? Theme.of(context).colorScheme.onSurface,
           ),
         ),
       ],
@@ -301,7 +299,7 @@ class _WalletScreenState extends State<WalletScreen> {
     if (entries.isEmpty && !_loadingEarnings) {
       return _Card(
         child: Center(
-          child: Text('No payments this month', style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+          child: Text('No payments this month', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
         ),
       );
     }
@@ -321,7 +319,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 _showAllSubscribers
                     ? 'See less'
                     : '+ See ${entries.length - 3} more',
-                style: TextStyle(color: Colors.blue[600], fontSize: 13, fontWeight: FontWeight.w500),
+                style: const TextStyle(color: ClosrColors.ember, fontSize: 13, fontWeight: FontWeight.w500),
               ),
             ),
           ],
@@ -337,10 +335,10 @@ class _WalletScreenState extends State<WalletScreen> {
         children: [
           CircleAvatar(
             radius: 16,
-            backgroundColor: Colors.blue[100],
+            backgroundColor: ClosrColors.emberSoft,
             child: Text(
               e.subscriberName.isNotEmpty ? e.subscriberName[0].toUpperCase() : '?',
-              style: TextStyle(fontSize: 12, color: Colors.blue[700], fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 12, color: ClosrColors.ink, fontWeight: FontWeight.bold),
             ),
           ),
           const SizedBox(width: 10),
@@ -351,7 +349,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 Text(e.subscriberName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                 Text(
                   _formatDate(e.date),
-                  style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11),
                 ),
               ],
             ),
@@ -381,7 +379,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text('Automatic monthly payout', style: TextStyle(fontSize: 14)),
-                  Text('Paid out on the 1st of each month', style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                  Text('Paid out on the 1st of each month', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 ],
               ),
               Switch(value: _autoPayoutEnabled, onChanged: _toggleAutoPayout),
@@ -390,7 +388,7 @@ class _WalletScreenState extends State<WalletScreen> {
           const Divider(height: 20),
           Row(
             children: [
-              Icon(Icons.account_balance_outlined, size: 18, color: Colors.grey[500]),
+              Icon(Icons.account_balance_outlined, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -410,9 +408,13 @@ class _WalletScreenState extends State<WalletScreen> {
                   ? null
                   : _handleRequestPayout,
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                side: BorderSide(color: _stripeConnectOnboarded ? Colors.black87 : Colors.grey[300]!),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                side: BorderSide(
+                  color: _stripeConnectOnboarded
+                      ? Theme.of(context).colorScheme.onSurface
+                      : Theme.of(context).colorScheme.outline,
+                  width: 1.5,
+                ),
               ),
               child: _payoutLoading
                   ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
@@ -422,7 +424,9 @@ class _WalletScreenState extends State<WalletScreen> {
                           : 'Connect Stripe first',
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
-                        color: _stripeConnectOnboarded ? Colors.black87 : Colors.grey,
+                        color: _stripeConnectOnboarded
+                            ? Theme.of(context).colorScheme.onSurface
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
             ),
@@ -440,19 +444,16 @@ class _WalletScreenState extends State<WalletScreen> {
           const Text('Stripe Connect', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           const SizedBox(height: 8),
           if (_stripeConnectOnboarded) ...[
-            Row(children: [
-              const Icon(Icons.check_circle, color: Colors.green, size: 20),
-              const SizedBox(width: 8),
-              const Text('Account connected', style: TextStyle(color: Colors.green, fontWeight: FontWeight.w500)),
+            Row(children: const [
+              Icon(Icons.check_circle, color: ClosrColors.green, size: 20),
+              SizedBox(width: 8),
+              Text('Account connected', style: TextStyle(color: ClosrColors.green, fontWeight: FontWeight.w500)),
             ]),
             const SizedBox(height: 12),
             Row(children: [
               Expanded(
                 child: OutlinedButton(
                   onPressed: _connectLoading ? null : _handleManageStripe,
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                  ),
                   child: const Text('Manage account'),
                 ),
               ),
@@ -461,10 +462,10 @@ class _WalletScreenState extends State<WalletScreen> {
                 child: OutlinedButton(
                   onPressed: _connectLoading ? null : _handleChangeStripeAccount,
                   style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                    side: BorderSide(color: Colors.grey[400]!),
+                    side: BorderSide(color: Theme.of(context).colorScheme.outline, width: 1.5),
+                    foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                  child: Text('Change account', style: TextStyle(color: Colors.grey[700])),
+                  child: Text('Change account', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 ),
               ),
             ]),
@@ -472,7 +473,7 @@ class _WalletScreenState extends State<WalletScreen> {
           else ...[
             Text(
               'Connect your Stripe account to receive payouts directly to your bank.',
-              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 12),
             SizedBox(
@@ -480,13 +481,11 @@ class _WalletScreenState extends State<WalletScreen> {
               child: ElevatedButton(
                 onPressed: _connectLoading ? null : _handleConnectStripe,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black87,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 child: _connectLoading
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Connect Stripe Account', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: ClosrColors.paper))
+                    : const Text('Connect Stripe Account', style: TextStyle(color: ClosrColors.paper, fontWeight: FontWeight.w600)),
               ),
             ),
           ],
@@ -508,9 +507,9 @@ class _Card extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withAlpha(15), blurRadius: 10, offset: const Offset(0, 2))],
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: ClosrColors.ink.withAlpha(12), blurRadius: 12, offset: const Offset(0, 3))],
       ),
       child: child,
     );
@@ -541,7 +540,6 @@ class WalletConnectSuccessScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -550,8 +548,8 @@ class WalletConnectSuccessScreen extends StatelessWidget {
             children: [
               Container(
                 width: 80, height: 80,
-                decoration: BoxDecoration(color: Colors.green[50], shape: BoxShape.circle),
-                child: Icon(Icons.check_circle_outline, size: 48, color: Colors.green[600]),
+                decoration: BoxDecoration(color: ClosrColors.green.withAlpha(30), shape: BoxShape.circle),
+                child: const Icon(Icons.check_circle_outline, size: 48, color: ClosrColors.green),
               ),
               const SizedBox(height: 24),
               const Text('Stripe account connected!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
@@ -559,7 +557,7 @@ class WalletConnectSuccessScreen extends StatelessWidget {
               Text(
                 'You can now request payouts directly to your bank account.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey[600], fontSize: 15),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 15),
               ),
               const SizedBox(height: 40),
               SizedBox(
@@ -567,11 +565,9 @@ class WalletConnectSuccessScreen extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black87,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text('Back to Wallet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                  child: const Text('Back to Wallet', style: TextStyle(color: ClosrColors.paper, fontWeight: FontWeight.w600)),
                 ),
               ),
             ],
