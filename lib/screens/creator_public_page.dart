@@ -6,6 +6,7 @@ import 'package:closr_app/services/firestore_service.dart';
 import 'package:closr_app/services/stripe_service.dart';
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/models/subscription_model.dart';
+import 'package:closr_app/theme.dart';
 
 class CreatorPublicPage extends StatefulWidget {
   final String username;
@@ -83,29 +84,54 @@ class _CreatorPublicPageState extends State<CreatorPublicPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const SizedBox(height: 24),
-                    CircleAvatar(
-                      radius: 56,
-                      backgroundColor: Colors.blue[100],
-                      backgroundImage: creator.photoUrl != null && creator.photoUrl!.isNotEmpty
-                          ? NetworkImage(creator.photoUrl!) as ImageProvider
-                          : null,
-                      child: creator.photoUrl == null || creator.photoUrl!.isEmpty
-                          ? Text(
-                              creator.displayName.isNotEmpty
-                                  ? creator.displayName[0].toUpperCase()
-                                  : widget.username[0].toUpperCase(),
-                              style: const TextStyle(fontSize: 40, color: Colors.white),
-                            )
-                          : null,
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      '${widget.username} invites you to chat privately.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
+                    const SizedBox(height: 8),
+                    // Plum gradient header with ember-ringed avatar
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [ClosrColors.plum, ClosrColors.darkBackground],
+                        ),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: ClosrColors.ember, width: 3),
+                            ),
+                            padding: const EdgeInsets.all(3),
+                            child: CircleAvatar(
+                              radius: 56,
+                              backgroundColor: ClosrColors.emberSoft,
+                              backgroundImage: creator.photoUrl != null && creator.photoUrl!.isNotEmpty
+                                  ? NetworkImage(creator.photoUrl!) as ImageProvider
+                                  : null,
+                              child: creator.photoUrl == null || creator.photoUrl!.isEmpty
+                                  ? Text(
+                                      creator.displayName.isNotEmpty
+                                          ? creator.displayName[0].toUpperCase()
+                                          : widget.username[0].toUpperCase(),
+                                      style: const TextStyle(fontSize: 40, color: ClosrColors.ink),
+                                    )
+                                  : null,
+                            ),
                           ),
+                          const SizedBox(height: 20),
+                          Text(
+                            '${widget.username} invites you to chat privately.',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: ClosrColors.paper,
+                                ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 24),
                     Align(
@@ -122,8 +148,8 @@ class _CreatorPublicPageState extends State<CreatorPublicPage> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(16),
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(shortBio, style: Theme.of(context).textTheme.bodyMedium),
                     ),
@@ -232,13 +258,12 @@ class _CreatorPublicPageState extends State<CreatorPublicPage> {
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
         child: isLoading
             ? const SizedBox(
                 height: 20,
                 width: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                child: CircularProgressIndicator(strokeWidth: 2, color: ClosrColors.paper),
               )
             : Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       ),
@@ -250,13 +275,13 @@ class _CreatorPublicPageState extends State<CreatorPublicPage> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(12),
+        color: ClosrColors.line,
+        borderRadius: BorderRadius.circular(999),
       ),
       child: const Text(
         'Full',
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black54),
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: ClosrColors.muted),
       ),
     );
   }
@@ -266,9 +291,9 @@ class _CreatorPublicPageState extends State<CreatorPublicPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[200]!),
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Theme.of(context).colorScheme.outline),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -287,14 +312,14 @@ class _CreatorPublicPageState extends State<CreatorPublicPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.search_off_outlined, size: 64, color: Colors.grey),
+            const Icon(Icons.search_off_outlined, size: 64, color: ClosrColors.muted),
             const SizedBox(height: 16),
             Text('Creator not found', textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
             Text(
               'No active creator matches this username.',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -309,7 +334,7 @@ class _CreatorPublicPageState extends State<CreatorPublicPage> {
         child: Text(
           message,
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.red[700]),
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: ClosrColors.rose),
         ),
       ),
     );

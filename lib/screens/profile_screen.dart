@@ -6,6 +6,7 @@ import 'package:closr_app/services/auth_service.dart';
 import 'package:closr_app/services/firestore_service.dart';
 import 'package:closr_app/screens/creator_settings_screen.dart';
 import 'package:closr_app/screens/wallet_screen.dart';
+import 'package:closr_app/theme.dart';
 
 class ProfileScreen extends StatefulWidget {
   final AppUser user;
@@ -76,22 +77,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     children: [
                       // Avatar
-                      CircleAvatar(
-                        radius: 40,
-                        backgroundColor: Colors.blue[100],
-                        backgroundImage: widget.user.photoUrl != null && widget.user.photoUrl!.isNotEmpty
-                            ? NetworkImage(widget.user.photoUrl!) as ImageProvider
-                            : null,
-                        child: widget.user.photoUrl == null || widget.user.photoUrl!.isEmpty
-                            ? Text(
-                                widget.user.displayName.substring(0, 1).toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue[700],
-                                ),
-                              )
-                            : null,
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: ClosrColors.ember, width: 3),
+                        ),
+                        padding: const EdgeInsets.all(3),
+                        child: CircleAvatar(
+                          radius: 40,
+                          backgroundColor: ClosrColors.emberSoft,
+                          backgroundImage: widget.user.photoUrl != null && widget.user.photoUrl!.isNotEmpty
+                              ? NetworkImage(widget.user.photoUrl!) as ImageProvider
+                              : null,
+                          child: widget.user.photoUrl == null || widget.user.photoUrl!.isEmpty
+                              ? Text(
+                                  widget.user.displayName.substring(0, 1).toUpperCase(),
+                                  style: const TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    color: ClosrColors.ink,
+                                  ),
+                                )
+                              : null,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -104,7 +112,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Text(
                         '@${widget.user.username}',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey[600],
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                       ),
                     ],
@@ -116,8 +124,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Card(
                   elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: Colors.grey[200]!),
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(color: Theme.of(context).colorScheme.outline),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -240,18 +248,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ElevatedButton(
                   onPressed: _handleSignOut,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red[600],
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                    backgroundColor: ClosrColors.rose,
+                    foregroundColor: ClosrColors.paper,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: const Text(
                     'Sign Out',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: ClosrColors.paper,
                     ),
                   ),
                 ),
@@ -271,7 +277,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Text(
           label,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
         ),
         Text(
@@ -293,18 +299,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: Theme.of(context).colorScheme.outline),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
         leading: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(10),
+            color: ClosrColors.emberSoft.withAlpha(80),
+            borderRadius: BorderRadius.circular(14),
           ),
-          child: Icon(icon, color: Colors.grey[700], size: 24),
+          child: Icon(icon, color: ClosrColors.ember, size: 24),
         ),
         title: Text(
           title,
@@ -319,7 +325,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         trailing: Icon(
           Icons.arrow_forward_ios_outlined,
           size: 16,
-          color: Colors.grey[400],
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
         onTap: onTap,
       ),
@@ -345,8 +351,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.black87,
-        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [ClosrColors.plum, ClosrColors.darkBackground],
+        ),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         children: [
@@ -355,13 +365,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Balance',
-                  style: TextStyle(color: Colors.white.withAlpha(160), fontSize: 13),
+                  'BALANCE',
+                  style: TextStyle(
+                    color: ClosrColors.emberSoft,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.6,
+                  ),
                 ),
                 const SizedBox(height: 4),
-                Text(
+                const Text(
                   '€ ···',
-                  style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: ClosrColors.paper, fontSize: 26, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -371,11 +386,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               MaterialPageRoute(builder: (_) => WalletScreen(creator: widget.user)),
             ),
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Colors.white54),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              foregroundColor: ClosrColors.paper,
+              side: const BorderSide(color: ClosrColors.ember, width: 1.5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             ),
-            child: const Text('View wallet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+            child: const Text('View wallet', style: TextStyle(color: ClosrColors.paper, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -471,21 +487,21 @@ class _EditSubscriberSheetState extends State<_EditSubscriberSheet> {
                 children: [
                   CircleAvatar(
                     radius: 40,
-                    backgroundColor: Colors.blue[100],
+                    backgroundColor: ClosrColors.emberSoft,
                     backgroundImage: _newPhotoBytes != null
                         ? MemoryImage(_newPhotoBytes!) as ImageProvider
                         : (widget.user.photoUrl != null ? NetworkImage(widget.user.photoUrl!) : null),
                     child: (_newPhotoBytes == null && widget.user.photoUrl == null)
                         ? Text(widget.user.displayName[0].toUpperCase(),
-                            style: const TextStyle(fontSize: 28, color: Colors.white))
+                            style: const TextStyle(fontSize: 28, color: ClosrColors.ink))
                         : null,
                   ),
                   Positioned(
                     bottom: 0, right: 0,
                     child: Container(
                       padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(color: Colors.blue[600], shape: BoxShape.circle),
-                      child: const Icon(Icons.camera_alt, size: 16, color: Colors.white),
+                      decoration: const BoxDecoration(color: ClosrColors.ember, shape: BoxShape.circle),
+                      child: const Icon(Icons.camera_alt, size: 16, color: ClosrColors.paper),
                     ),
                   ),
                 ],
@@ -497,40 +513,36 @@ class _EditSubscriberSheetState extends State<_EditSubscriberSheet> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red[50], borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red[200]!),
+                color: ClosrColors.rose.withAlpha(28), borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: ClosrColors.rose.withAlpha(90)),
               ),
-              child: Text(_error!, style: TextStyle(color: Colors.red[700], fontSize: 13)),
+              child: Text(_error!, style: const TextStyle(color: ClosrColors.rose, fontSize: 13)),
             ),
             const SizedBox(height: 16),
           ],
           TextField(
             controller: _nameController,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               labelText: 'Display name',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _usernameController,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               labelText: 'Username',
               prefixText: '@',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: _isLoading ? null : _submit,
             style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              backgroundColor: Colors.blue[600],
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
             child: _isLoading
-                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Save', style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: ClosrColors.paper))
+                : const Text('Save', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -613,58 +625,53 @@ class _BecomeCreatorSheetState extends State<_BecomeCreatorSheet> {
           const SizedBox(height: 4),
           Text(
             'This action is irreversible — you cannot go back to subscriber mode.',
-            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 24),
           if (_error != null) ...[
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red[200]!),
+                color: ClosrColors.rose.withAlpha(28),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: ClosrColors.rose.withAlpha(90)),
               ),
-              child: Text(_error!, style: TextStyle(color: Colors.red[700], fontSize: 13)),
+              child: Text(_error!, style: const TextStyle(color: ClosrColors.rose, fontSize: 13)),
             ),
             const SizedBox(height: 16),
           ],
           TextField(
             controller: _priceController,
             keyboardType: TextInputType.number,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               labelText: 'Monthly subscription price (€)',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _limitController,
             keyboardType: TextInputType.number,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               labelText: 'Subscriber limit',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _bioController,
             maxLength: 100,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               labelText: 'Bio (optional)',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: _isLoading ? null : _submit,
             style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              backgroundColor: Colors.blue[600],
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
             child: _isLoading
-                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Become a Creator', style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: ClosrColors.paper))
+                : const Text('Become a Creator', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

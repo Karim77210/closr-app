@@ -6,6 +6,7 @@ import 'package:closr_app/main.dart' show PendingNavigation;
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/auth_service.dart';
 import 'package:closr_app/widgets/loading_overlay.dart';
+import 'package:closr_app/theme.dart';
 
 const _funNames = [
   'Brave Panda', 'Swift Falcon', 'Curious Otter', 'Quiet Tiger',
@@ -252,7 +253,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             : 'Finish setting up your subscriber account',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey[700],
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                   ),
                   const SizedBox(height: 24),
@@ -261,13 +262,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.red[50],
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.red[200]!),
+                        color: ClosrColors.rose.withAlpha(28),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: ClosrColors.rose.withAlpha(90)),
                       ),
                       child: Text(
                         _errorMessage!,
-                        style: const TextStyle(color: Colors.red),
+                        style: const TextStyle(color: ClosrColors.rose),
                       ),
                     ),
                   if (_errorMessage != null) const SizedBox(height: 20),
@@ -279,7 +280,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       title: 'I\'m a Creator',
                       description: 'Monetize your audience with paid subscribers.',
                       icon: Icons.star_outlined,
-                      iconColor: Colors.orange,
+                      iconColor: ClosrColors.ember,
                     ),
                     const SizedBox(height: 16),
                     _buildRoleCard(
@@ -288,7 +289,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       title: 'I\'m a Subscriber',
                       description: 'Connect with creators you admire.',
                       icon: Icons.favorite_outlined,
-                      iconColor: Colors.red,
+                      iconColor: ClosrColors.rose,
                     ),
                   ] else if (_selectedRole == UserRole.creator) ...[
                     _buildUploadPhotoCard(context),
@@ -353,9 +354,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       onPressed: _isLoading ? null : _submitCreatorProfile,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
                       ),
                       child: const Text('Complete Creator Setup'),
                     ),
@@ -372,9 +370,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       onPressed: _isLoading ? null : _submitSubscriberProfile,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
                       ),
                       child: const Text('Complete Setup'),
                     ),
@@ -394,20 +389,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.grey[300]!),
-          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Theme.of(context).colorScheme.outline),
+          color: Theme.of(context).colorScheme.surface,
         ),
         child: Row(
           children: [
             CircleAvatar(
               radius: 28,
-              backgroundColor: Colors.blue[100],
+              backgroundColor: ClosrColors.emberSoft,
               backgroundImage: _profileImageData != null
                   ? MemoryImage(_profileImageData!) as ImageProvider<Object>
                   : (widget.photoUrl != null ? NetworkImage(widget.photoUrl!) : null) as ImageProvider<Object>?,
               child: _profileImage == null && widget.photoUrl == null
-                  ? const Icon(Icons.camera_alt_outlined, color: Colors.white)
+                  ? const Icon(Icons.camera_alt_outlined, color: ClosrColors.ink)
                   : null,
             ),
             const SizedBox(width: 16),
@@ -421,7 +416,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ],
               ),
             ),
-            const Icon(Icons.edit, color: Colors.blue),
+            const Icon(Icons.edit, color: ClosrColors.ember),
           ],
         ),
       ),
@@ -446,7 +441,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -466,10 +460,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.blue[50] : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected
+              ? ClosrColors.emberSoft.withAlpha(70)
+              : Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? Colors.blue[600]! : Colors.grey[300]!,
+            color: isSelected ? ClosrColors.ember : Theme.of(context).colorScheme.outline,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -492,14 +488,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     title,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
                         ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     description,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                   ),
                 ],
@@ -509,13 +504,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               Container(
                 width: 24,
                 height: 24,
-                decoration: BoxDecoration(
-                  color: Colors.blue[600],
+                decoration: const BoxDecoration(
+                  color: ClosrColors.ember,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.check,
-                  color: Colors.white,
+                  color: ClosrColors.paper,
                   size: 16,
                 ),
               ),

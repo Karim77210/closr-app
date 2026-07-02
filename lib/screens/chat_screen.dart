@@ -12,6 +12,7 @@ import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/firestore_service.dart';
 import 'package:closr_app/services/storage_service.dart';
 import 'package:closr_app/widgets/message_bubble.dart';
+import 'package:closr_app/theme.dart';
 
 class ChatScreen extends StatefulWidget {
   final String creatorUid;
@@ -242,14 +243,14 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundColor: Colors.blue[100],
+              backgroundColor: ClosrColors.emberSoft,
               backgroundImage: _otherUser?.photoUrl != null
                   ? NetworkImage(_otherUser!.photoUrl!) as ImageProvider
                   : null,
               child: _otherUser?.photoUrl == null
                   ? Text(
                       otherName.isNotEmpty ? otherName[0].toUpperCase() : '?',
-                      style: const TextStyle(fontSize: 14, color: Colors.white),
+                      style: const TextStyle(fontSize: 14, color: ClosrColors.ink),
                     )
                   : null,
             ),
@@ -257,7 +258,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Text(otherName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           ],
         ),
-        elevation: 1,
+        elevation: 0,
       ),
       body: Column(
         children: [
@@ -290,11 +291,11 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey[300]),
+                Icon(Icons.chat_bubble_outline, size: 48, color: ClosrColors.emberSoft),
                 const SizedBox(height: 12),
                 Text(
                   _isCreator ? 'Start the conversation' : 'Send your first message',
-                  style: TextStyle(color: Colors.grey[500]),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -345,8 +346,8 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Colors.grey[200]!)),
+          color: Theme.of(context).scaffoldBackgroundColor,
+          border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outline)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -386,13 +387,19 @@ class _ChatScreenState extends State<ChatScreen> {
                                 : _messagesRemainingToday <= 0
                                     ? 'Daily limit reached'
                                     : 'Message…',
+                        filled: true,
+                        fillColor: Theme.of(context).colorScheme.surface,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
+                          borderRadius: BorderRadius.circular(999),
+                          borderSide: BorderSide.none,
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
+                          borderRadius: BorderRadius.circular(999),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(999),
+                          borderSide: const BorderSide(color: ClosrColors.ember, width: 1.5),
                         ),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                         counterText: '',
@@ -413,7 +420,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 else
                   IconButton(
                     icon: const Icon(Icons.send),
-                    color: Colors.blue[600],
+                    color: ClosrColors.ember,
                     onPressed: (_isCreator || _canSend()) ? _sendText : null,
                   ),
               ],
@@ -431,19 +438,23 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Row(
         children: [
           if (_cooldownRemaining > 0) ...[
-            Icon(Icons.timer_outlined, size: 14, color: Colors.orange[700]),
+            const Icon(Icons.timer_outlined, size: 14, color: ClosrColors.ember),
             const SizedBox(width: 4),
+            const Text(
+              'Wait',
+              style: TextStyle(fontSize: 12, color: ClosrColors.ember),
+            ),
             Text(
-              'Wait ${_cooldownRemaining}s',
-              style: TextStyle(fontSize: 12, color: Colors.orange[700]),
+              ' ${_cooldownRemaining}s',
+              style: const TextStyle(fontSize: 12, color: ClosrColors.ember),
             ),
             const SizedBox(width: 16),
           ],
-          Icon(Icons.chat_bubble_outline, size: 14, color: Colors.grey[500]),
+          Icon(Icons.chat_bubble_outline, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
           const SizedBox(width: 4),
           Text(
             '$_messagesRemainingToday / ${_creator!.maxMessagesPerDay} messages left today',
-            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -487,15 +498,15 @@ class _DateSeparator extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
-          Expanded(child: Divider(color: Colors.grey[300])),
+          const Expanded(child: Divider()),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(
               _label,
-              style: TextStyle(fontSize: 12, color: Colors.grey[500], fontWeight: FontWeight.w500),
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
             ),
           ),
-          Expanded(child: Divider(color: Colors.grey[300])),
+          const Expanded(child: Divider()),
         ],
       ),
     );
@@ -512,7 +523,7 @@ class _MediaButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton(
       icon: Icon(icon),
-      color: onTap != null ? Colors.grey[700] : Colors.grey[300],
+      color: onTap != null ? ClosrColors.ember : Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(120),
       onPressed: onTap,
     );
   }
@@ -673,8 +684,8 @@ class _MultiMediaPreviewSheetState extends State<_MultiMediaPreviewSheet> {
                 ),
                 const SizedBox(width: 8),
                 IconButton(
-                  icon: const Icon(Icons.send, color: Colors.white),
-                  style: IconButton.styleFrom(backgroundColor: Colors.blue[600]),
+                  icon: const Icon(Icons.send, color: ClosrColors.paper),
+                  style: IconButton.styleFrom(backgroundColor: ClosrColors.ember),
                   onPressed: _send,
                 ),
               ],
