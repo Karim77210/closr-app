@@ -1,15 +1,23 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/auth_service.dart';
 import 'package:closr_app/services/firestore_service.dart';
 import 'package:closr_app/services/stripe_service.dart';
 import 'package:closr_app/screens/creator_settings_screen.dart';
+import 'package:closr_app/screens/edit_profile_screen.dart';
 import 'package:closr_app/screens/wallet_screen.dart';
+import 'package:closr_app/widgets/closr_avatar.dart';
+import 'package:closr_app/widgets/error_banner.dart';
+import 'package:closr_app/widgets/grouped_list.dart';
+import 'package:closr_app/widgets/labeled_field.dart';
+import 'package:closr_app/widgets/page_heading.dart';
 import 'package:closr_app/theme.dart';
 
+/// Settings hub (Figma "Settings"): balance + avatar header, grouped
+/// Payments / Security / Creator / General sections.
 class ProfileScreen extends StatefulWidget {
   final AppUser user;
 
@@ -63,6 +71,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
+  // ─── Actions ──────────────────────────────────────────────────────────────
+
   void _handleSignOut() {
     showDialog(
       context: context,
@@ -88,365 +98,140 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 }
               }
             },
-            child: const Text('Sign Out'),
+            child: const Text('Sign Out', style: TextStyle(color: ClosrColors.rose)),
           ),
         ],
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
+  bool get _hasPasswordProvider {
+    final providers = FirebaseAuth.instance.currentUser?.providerData ?? [];
+    return providers.any((p) => p.providerId == 'password');
+  }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profil'),
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(
-          horizontal: isMobile ? 16 : 32,
-          vertical: 24,
-        ),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Profile info
-                Center(
-                  child: Column(
-                    children: [
-                      // Avatar
-                      Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: ClosrColors.ember, width: 3),
-                        ),
-                        padding: const EdgeInsets.all(3),
-                        child: CircleAvatar(
-                          radius: 40,
-                          backgroundColor: ClosrColors.emberSoft,
-                          backgroundImage: _user.photoUrl != null && _user.photoUrl!.isNotEmpty
-                              ? NetworkImage(_user.photoUrl!) as ImageProvider
-                              : null,
-                          child: _user.photoUrl == null || _user.photoUrl!.isEmpty
-                              ? Text(
-                                  _user.displayName.substring(0, 1).toUpperCase(),
-                                  style: const TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                    color: ClosrColors.ink,
-                                  ),
-                                )
-                              : null,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _user.displayName,
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '@${_user.username}',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Account info
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    side: BorderSide(color: Theme.of(context).colorScheme.outline),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Account Information',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                        const SizedBox(height: 16),
-                        _buildInfoRow('Email', _user.email),
-                        const SizedBox(height: 12),
-                        _buildInfoRow(
-                          'Member Since',
-                          _formatDate(_user.createdAt),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildInfoRow(
-                          'Status',
-                          _user.isActive ? 'Active' : 'Inactive',
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Wallet card — creators only
-                if (_user.role == UserRole.creator) ...[
-                  _buildWalletCard(context),
-                  const SizedBox(height: 32),
-                ] else
-                  const SizedBox(height: 32),
-
-                // Settings section
-                Text(
-                  'Settings',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(height: 16),
-
-                _buildSettingsTile(
-                  icon: Icons.edit_outlined,
-                  title: 'Edit Profile',
-                  subtitle: 'Update your name and photo',
-                  onTap: () {
-                    if (_user.role == UserRole.creator) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CreatorSettingsScreen(user: widget.user),
-                        ),
-                      );
-                    } else {
-                      _showEditSubscriberSheet(context);
-                    }
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                if (_user.role == UserRole.subscriber) ...[
-                  _buildSettingsTile(
-                    icon: Icons.star_outline,
-                    title: 'Become a Creator',
-                    subtitle: 'Monetize your audience with paid subscribers',
-                    onTap: () => _showBecomeCreatorSheet(context),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                if (_user.role == UserRole.creator)
-                  Column(
-                    children: [
-                      _buildSettingsTile(
-                        icon: Icons.settings_outlined,
-                        title: 'Creator Settings',
-                        subtitle: 'Edit creator page, pricing, payouts, and limits',
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => CreatorSettingsScreen(user: widget.user),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildSettingsTile(
-                        icon: Icons.trending_up_outlined,
-                        title: 'Analytics',
-                        subtitle: 'View your subscriber stats',
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Coming soon!')),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                  ),
-
-                _buildSettingsTile(
-                  icon: Icons.privacy_tip_outlined,
-                  title: 'Privacy Policy',
-                  subtitle: 'Read our privacy policy',
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Coming soon!')),
-                    );
-                  },
-                ),
-                const SizedBox(height: 32),
-
-                // Sign out button
-                ElevatedButton(
-                  onPressed: _handleSignOut,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: ClosrColors.rose,
-                    foregroundColor: ClosrColors.paper,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: const Text(
-                    'Sign Out',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: ClosrColors.paper,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-              ],
+  void _handleChangePassword() {
+    if (!_hasPasswordProvider) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Password managed by Google'),
+          content: const Text(
+            'You signed in with Google — your password is managed by your Google account.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
             ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Change password'),
+        content: Text('We will send a password reset link to ${_user.email}.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-        ),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSettingsTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: Theme.of(context).colorScheme.outline),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: ClosrColors.emberSoft.withAlpha(80),
-            borderRadius: BorderRadius.circular(14),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await FirebaseAuth.instance
+                    .sendPasswordResetEmail(email: _user.email);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Password reset link sent to ${_user.email}')),
+                );
+              } on FirebaseAuthException catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(e.message ?? 'Could not send reset email')),
+                );
+              }
+            },
+            child: const Text('Send link'),
           ),
-          child: Icon(icon, color: ClosrColors.ember, size: 24),
-        ),
-        title: Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        trailing: Icon(
-          Icons.arrow_forward_ios_outlined,
-          size: 16,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-        onTap: onTap,
+        ],
       ),
     );
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
-
-  void _showEditSubscriberSheet(BuildContext context) {
+  void _handleChangeEmail() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => _EditSubscriberSheet(user: widget.user),
+      builder: (_) => const _ChangeEmailSheet(),
     );
   }
 
-  Widget _buildWalletCard(BuildContext context) {
-    String balanceText;
-    if (_balanceLoading) {
-      balanceText = '€ …';
-    } else if (_balanceCents == null) {
-      balanceText = '€ ?';
-    } else {
-      balanceText = '€ ${(_balanceCents! / 100).toStringAsFixed(2)}';
+  Future<void> _handlePaymentMethods() async {
+    if (_user.role == UserRole.creator && _user.stripeConnectOnboarded) {
+      try {
+        await _stripeService.openStripeDashboard();
+      } on Exception catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+      return;
     }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Coming soon!')),
+    );
+  }
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [ClosrColors.plum, ClosrColors.darkBackground],
-        ),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'BALANCE',
-                  style: TextStyle(
-                    color: ClosrColors.emberSoft,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.6,
+  void _showConnectedApps() {
+    final providers = FirebaseAuth.instance.currentUser?.providerData ?? [];
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.outline,
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  balanceText,
-                  style: const TextStyle(color: ClosrColors.paper, fontSize: 26, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 20),
+              Text('Connected apps', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 20),
+              GroupedSection(
+                children: [
+                  for (final p in providers)
+                    GroupedRow(
+                      icon: p.providerId == 'google.com'
+                          ? Icons.g_mobiledata
+                          : Icons.email_outlined,
+                      label: p.providerId == 'google.com'
+                          ? 'Google — ${p.email ?? _user.email}'
+                          : 'Email — ${p.email ?? _user.email}',
+                      trailing: const SizedBox.shrink(),
+                    ),
+                ],
+              ),
+            ],
           ),
-          OutlinedButton(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => WalletScreen(creator: _user)),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: ClosrColors.paper,
-              side: const BorderSide(color: ClosrColors.ember, width: 1.5),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            ),
-            child: const Text('View wallet', style: TextStyle(color: ClosrColors.paper, fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -454,153 +239,311 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (_) => _BecomeCreatorSheet(user: widget.user),
+    );
+  }
+
+  void _openEditProfile() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => EditProfileScreen(user: _user)),
+    );
+  }
+
+  void _comingSoon() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Coming soon!')),
+    );
+  }
+
+  // ─── Build ────────────────────────────────────────────────────────────────
+
+  String get _balanceText {
+    if (_balanceLoading) return '€ …';
+    if (_balanceCents == null) return '€ ?';
+    return '€${(_balanceCents! / 100).toStringAsFixed(2)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isCreator = _user.role == UserRole.creator;
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ─── Header: balance / name + avatar ─────────────────────
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (isCreator) ...[
+                            Text(
+                              'Balance',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontSize: 15,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _balanceText,
+                              style: theme.textTheme.headlineLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            OutlinedButton(
+                              onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => WalletScreen(creator: _user),
+                                ),
+                              ),
+                              child: const Text('View wallet'),
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 8),
+                            PageHeading(_user.displayName),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        ClosrAvatar(
+                          photoUrl: _user.photoUrl?.isNotEmpty == true ? _user.photoUrl : null,
+                          initialSource: _user.displayName,
+                          size: 92,
+                          editBadge: true,
+                          onTap: _openEditProfile,
+                          onEditTap: _openEditProfile,
+                        ),
+                        const SizedBox(height: 10),
+                        Text('@${_user.username}', style: theme.textTheme.titleMedium),
+                        if (_user.bio.trim().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          SizedBox(
+                            width: 180,
+                            child: Text(
+                              _user.bio,
+                              textAlign: TextAlign.right,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // ─── Payments ─────────────────────────────────────────────
+                const SectionTitle('Payments'),
+                GroupedSection(
+                  children: [
+                    GroupedRow(
+                      icon: Icons.lock_outline,
+                      label: 'Payment methods',
+                      onTap: _handlePaymentMethods,
+                    ),
+                  ],
+                ),
+
+                // ─── Security ─────────────────────────────────────────────
+                const SectionTitle('Security'),
+                GroupedSection(
+                  children: [
+                    GroupedRow(
+                      icon: Icons.lock_outline,
+                      label: 'Change password',
+                      onTap: _handleChangePassword,
+                    ),
+                    GroupedRow(
+                      icon: Icons.email_outlined,
+                      label: 'Change email address',
+                      onTap: _handleChangeEmail,
+                    ),
+                    GroupedRow(
+                      icon: Icons.grid_view_outlined,
+                      label: 'Manage connected apps',
+                      onTap: _showConnectedApps,
+                    ),
+                  ],
+                ),
+
+                // ─── Creator ──────────────────────────────────────────────
+                const SectionTitle('Creator'),
+                GroupedSection(
+                  children: [
+                    if (isCreator) ...[
+                      GroupedRow(
+                        icon: Icons.settings_outlined,
+                        label: 'Creator Settings',
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => CreatorSettingsScreen(user: _user),
+                          ),
+                        ),
+                      ),
+                      GroupedRow(
+                        icon: Icons.trending_up_outlined,
+                        label: 'Analytics',
+                        onTap: _comingSoon,
+                      ),
+                    ] else
+                      GroupedRow(
+                        icon: Icons.star_outline,
+                        label: 'Become a Creator',
+                        onTap: () => _showBecomeCreatorSheet(context),
+                      ),
+                  ],
+                ),
+
+                // ─── General ──────────────────────────────────────────────
+                const SectionTitle('General'),
+                GroupedSection(
+                  children: [
+                    GroupedRow(
+                      icon: Icons.privacy_tip_outlined,
+                      label: 'Privacy Policy',
+                      onTap: _comingSoon,
+                    ),
+                    GroupedRow(
+                      icon: Icons.logout,
+                      label: 'Sign Out',
+                      destructive: true,
+                      onTap: _handleSignOut,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
 
-class _EditSubscriberSheet extends StatefulWidget {
-  final AppUser user;
-  const _EditSubscriberSheet({required this.user});
+// ─── Change email sheet ───────────────────────────────────────────────────────
+
+class _ChangeEmailSheet extends StatefulWidget {
+  const _ChangeEmailSheet();
 
   @override
-  State<_EditSubscriberSheet> createState() => _EditSubscriberSheetState();
+  State<_ChangeEmailSheet> createState() => _ChangeEmailSheetState();
 }
 
-class _EditSubscriberSheetState extends State<_EditSubscriberSheet> {
-  final _authService = AuthService();
-  final _imagePicker = ImagePicker();
-  late final _nameController = TextEditingController(text: widget.user.displayName);
-  late final _usernameController = TextEditingController(text: widget.user.username);
-  XFile? _newPhoto;
-  Uint8List? _newPhotoBytes;
-  bool _isLoading = false;
+class _ChangeEmailSheetState extends State<_ChangeEmailSheet> {
+  final _emailController = TextEditingController();
+  bool _isSaving = false;
   String? _error;
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _usernameController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
-  Future<void> _pickPhoto() async {
-    final file = await _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 80);
-    if (file == null) return;
-    final bytes = await file.readAsBytes();
-    setState(() { _newPhoto = file; _newPhotoBytes = bytes; });
-  }
-
   Future<void> _submit() async {
-    final name = _nameController.text.trim();
-    final username = _usernameController.text.trim().toLowerCase();
-    if (name.isEmpty || username.isEmpty) {
-      setState(() => _error = 'Name and username are required');
+    final newEmail = _emailController.text.trim();
+    if (newEmail.isEmpty || !newEmail.contains('@')) {
+      setState(() => _error = 'Please enter a valid email address');
       return;
     }
-    setState(() { _isLoading = true; _error = null; });
+    setState(() { _isSaving = true; _error = null; });
     try {
-      await _authService.updateUserProfile(
-        uid: widget.user.uid,
-        displayName: name,
-        username: username,
-        photoFile: _newPhoto,
-      );
+      await FirebaseAuth.instance.currentUser?.verifyBeforeUpdateEmail(newEmail);
       if (!mounted) return;
       Navigator.of(context).pop();
-      Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
-    } on Exception catch (e) {
-      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Verification link sent — your email updates after you confirm it.'),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      setState(() => _error = e.code == 'requires-recent-login'
+          ? 'For security, please sign out and sign back in, then retry.'
+          : (e.message ?? 'Could not update email'));
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
       padding: EdgeInsets.only(
-        left: 24, right: 24, top: 24,
+        left: 24, right: 24, top: 16,
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Edit Profile', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 24),
           Center(
-            child: GestureDetector(
-              onTap: _pickPhoto,
-              child: Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 40,
-                    backgroundColor: ClosrColors.emberSoft,
-                    backgroundImage: _newPhotoBytes != null
-                        ? MemoryImage(_newPhotoBytes!) as ImageProvider
-                        : (widget.user.photoUrl != null ? NetworkImage(widget.user.photoUrl!) : null),
-                    child: (_newPhotoBytes == null && widget.user.photoUrl == null)
-                        ? Text(widget.user.displayName[0].toUpperCase(),
-                            style: const TextStyle(fontSize: 28, color: ClosrColors.ink))
-                        : null,
-                  ),
-                  Positioned(
-                    bottom: 0, right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(color: ClosrColors.ember, shape: BoxShape.circle),
-                      child: const Icon(Icons.camera_alt, size: 16, color: ClosrColors.paper),
-                    ),
-                  ),
-                ],
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.outline,
+                borderRadius: BorderRadius.circular(999),
               ),
             ),
           ),
           const SizedBox(height: 20),
+          Text('Change email address', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 20),
           if (_error != null) ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: ClosrColors.rose.withAlpha(28), borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: ClosrColors.rose.withAlpha(90)),
-              ),
-              child: Text(_error!, style: const TextStyle(color: ClosrColors.rose, fontSize: 13)),
-            ),
+            ErrorBanner(_error!),
             const SizedBox(height: 16),
           ],
-          TextField(
-            controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: 'Display name',
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _usernameController,
-            decoration: const InputDecoration(
-              labelText: 'Username',
-              prefixText: '@',
-            ),
+          LabeledField(
+            label: 'New email',
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            hint: 'olivia.r@closr.com',
           ),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: _isLoading ? null : _submit,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            child: _isLoading
-                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: ClosrColors.paper))
-                : const Text('Save', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            onPressed: _isSaving ? null : _submit,
+            child: _isSaving
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Text('Send verification link'),
           ),
         ],
       ),
     );
   }
 }
+
+// ─── Become creator sheet ─────────────────────────────────────────────────────
 
 class _BecomeCreatorSheet extends StatefulWidget {
   final AppUser user;
@@ -611,7 +554,6 @@ class _BecomeCreatorSheet extends StatefulWidget {
 }
 
 class _BecomeCreatorSheetState extends State<_BecomeCreatorSheet> {
-  final _authService = AuthService();
   final _firestoreService = FirestoreService();
   final _priceController = TextEditingController(text: '20');
   final _limitController = TextEditingController(text: '50');
@@ -631,8 +573,8 @@ class _BecomeCreatorSheetState extends State<_BecomeCreatorSheet> {
     final price = int.tryParse(_priceController.text.trim()) ?? 0;
     final limit = int.tryParse(_limitController.text.trim()) ?? 0;
 
-    if (price < 20) {
-      setState(() => _error = 'Minimum price is €20');
+    if (price <= 0) {
+      setState(() => _error = 'Price must be greater than €0');
       return;
     }
     if (limit <= 0) {
@@ -647,7 +589,7 @@ class _BecomeCreatorSheetState extends State<_BecomeCreatorSheet> {
         'subscriptionPriceCents': price * 100,
         'subscriberLimit': limit,
         'bio': _bioController.text.trim(),
-        'updatedAt': DateTime.now(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -661,71 +603,73 @@ class _BecomeCreatorSheetState extends State<_BecomeCreatorSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
       padding: EdgeInsets.only(
-        left: 24, right: 24, top: 24,
+        left: 24, right: 24, top: 16,
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Become a Creator',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'This action is irreversible — you cannot go back to subscriber mode.',
-            style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 24),
-          if (_error != null) ...[
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: ClosrColors.rose.withAlpha(28),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: ClosrColors.rose.withAlpha(90)),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.outline,
+                  borderRadius: BorderRadius.circular(999),
+                ),
               ),
-              child: Text(_error!, style: const TextStyle(color: ClosrColors.rose, fontSize: 13)),
+            ),
+            const SizedBox(height: 20),
+            Text('Become a Creator', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              'This action is irreversible — you cannot go back to subscriber mode.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (_error != null) ...[
+              ErrorBanner(_error!),
+              const SizedBox(height: 16),
+            ],
+            LabeledField(
+              label: 'Monthly subscription price (€)',
+              controller: _priceController,
+              keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 16),
+            LabeledField(
+              label: 'Subscriber limit',
+              controller: _limitController,
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 16),
+            LabeledField(
+              label: 'Bio (optional)',
+              controller: _bioController,
+              hint: 'Coach and content creator...',
+              maxLines: 3,
+              maxLength: 100,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _isLoading ? null : _submit,
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Become a Creator'),
+            ),
           ],
-          TextField(
-            controller: _priceController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Monthly subscription price (€)',
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _limitController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Subscriber limit',
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _bioController,
-            maxLength: 100,
-            decoration: const InputDecoration(
-              labelText: 'Bio (optional)',
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _isLoading ? null : _submit,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            child: _isLoading
-                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: ClosrColors.paper))
-                : const Text('Become a Creator', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          ),
-        ],
+        ),
       ),
     );
   }

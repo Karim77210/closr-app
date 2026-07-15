@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -11,6 +10,8 @@ import 'package:closr_app/models/message_model.dart';
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/firestore_service.dart';
 import 'package:closr_app/services/storage_service.dart';
+import 'package:closr_app/widgets/circle_icon_button.dart';
+import 'package:closr_app/widgets/closr_avatar.dart';
 import 'package:closr_app/widgets/message_bubble.dart';
 import 'package:closr_app/theme.dart';
 
@@ -42,6 +43,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   AppUser? _creator;
   AppUser? _otherUser;
+  AppUser? _me;
 
   int _messagesRemainingToday = 0;
   int _cooldownRemaining = 0;
@@ -73,10 +75,14 @@ class _ChatScreenState extends State<ChatScreen> {
     final creator = await _firestoreService.getUser(widget.creatorUid);
     final other = await _firestoreService.getUser(
         _isCreator ? widget.subscriberUid : widget.creatorUid);
+    final me = _isCreator
+        ? creator
+        : await _firestoreService.getUser(_currentUserUid);
     if (!mounted) return;
     setState(() {
       _creator = creator;
       _otherUser = other;
+      _me = me;
       // Initialize to max so UI doesn't flash "0 remaining" before count loads
       if (!_isCreator && creator != null) {
         _messagesRemainingToday = creator.maxMessagesPerDay;
@@ -231,31 +237,52 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return PopScope(
       canPop: false,
-      onPopInvoked: (_) => Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false),
+      onPopInvokedWithResult: (_, __) =>
+          Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false),
       child: Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
           onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false),
         ),
         titleSpacing: 0,
         title: Row(
           children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: ClosrColors.emberSoft,
-              backgroundImage: _otherUser?.photoUrl != null
-                  ? NetworkImage(_otherUser!.photoUrl!) as ImageProvider
-                  : null,
-              child: _otherUser?.photoUrl == null
-                  ? Text(
-                      otherName.isNotEmpty ? otherName[0].toUpperCase() : '?',
-                      style: const TextStyle(fontSize: 14, color: ClosrColors.ink),
-                    )
-                  : null,
+            ClosrAvatar(
+              photoUrl: _otherUser?.photoUrl?.isNotEmpty == true ? _otherUser!.photoUrl : null,
+              initialSource: otherName,
+              size: 40,
             ),
             const SizedBox(width: 10),
-            Text(otherName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(otherName,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(height: 1.1)),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'ONLINE',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            fontSize: 10,
+                            color: ClosrColors.green,
+                          ),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: ClosrColors.green,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ],
         ),
         elevation: 0,
@@ -310,6 +337,8 @@ class _ChatScreenState extends State<ChatScreen> {
           itemCount: messages.length,
           itemBuilder: (context, index) {
             final msg = messages[index];
+            final isMe = msg.senderId == _currentUserUid;
+            final sender = isMe ? _me : _otherUser;
             final showDate = index == 0 ||
                 !_sameDay(messages[index - 1].timestamp, msg.timestamp);
             final showCaption = _shouldShowCaption(messages, index);
@@ -319,8 +348,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (showDate) _DateSeparator(date: msg.timestamp),
                 MessageBubble(
                   message: msg,
-                  isMe: msg.senderId == _currentUserUid,
+                  isMe: isMe,
                   showCaption: showCaption,
+                  avatar: ClosrAvatar(
+                    photoUrl: sender?.photoUrl?.isNotEmpty == true ? sender!.photoUrl : null,
+                    initialSource: sender?.displayName ?? '?',
+                    size: 24,
+                  ),
                   onMediaTap: msg.isMedia
                       ? () {
                           final mediaIndex = mediaMessages.indexOf(msg);
@@ -342,26 +376,28 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildInput() {
+    final canSend = _isCreator || _canSend();
+
     return SafeArea(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outline)),
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        color: Theme.of(context).scaffoldBackgroundColor,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (!_isCreator && _creator != null) _buildSubscriberStatus(),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 if (_isCreator) ...[
-                  _MediaButton(
-                    icon: Icons.perm_media_outlined,
+                  CircleIconButton(
+                    icon: Icons.add_photo_alternate_outlined,
+                    shape: CircleIconButtonShape.squircle,
+                    size: 42,
                     onTap: _isUploading ? null : _pickAndPreviewMedia,
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 8),
                 ],
                 Expanded(
                   child: Focus(
@@ -378,7 +414,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       controller: _textController,
                       maxLength: _isCreator ? null : _creator?.messageCharacterLimit,
                       maxLines: null,
-                      enabled: _isCreator || _canSend(),
+                      enabled: canSend,
                       decoration: InputDecoration(
                         hintText: _isCreator
                             ? 'Message…'
@@ -387,42 +423,43 @@ class _ChatScreenState extends State<ChatScreen> {
                                 : _messagesRemainingToday <= 0
                                     ? 'Daily limit reached'
                                     : 'Message…',
-                        filled: true,
-                        fillColor: Theme.of(context).colorScheme.surface,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(999),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(999),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(999),
-                          borderSide: const BorderSide(color: ClosrColors.ember, width: 1.5),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        contentPadding: const EdgeInsets.only(left: 16, top: 10, bottom: 10),
                         counterText: '',
+                        // Ember send button embedded inside the field (Figma)
+                        suffixIcon: Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: _isUploading
+                              ? const SizedBox(
+                                  width: 34,
+                                  height: 34,
+                                  child: Padding(
+                                    padding: EdgeInsets.all(8),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: ClosrColors.ember),
+                                  ),
+                                )
+                              : GestureDetector(
+                                  onTap: canSend ? _sendText : null,
+                                  child: Container(
+                                    width: 34,
+                                    height: 34,
+                                    decoration: BoxDecoration(
+                                      color: canSend
+                                          ? ClosrColors.ember
+                                          : ClosrColors.ember.withAlpha(80),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.send_rounded,
+                                        color: Colors.white, size: 16),
+                                  ),
+                                ),
+                        ),
+                        suffixIconConstraints:
+                            const BoxConstraints(minWidth: 42, minHeight: 34),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                if (_isUploading)
-                  const SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: Padding(
-                      padding: EdgeInsets.all(8),
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                else
-                  IconButton(
-                    icon: const Icon(Icons.send),
-                    color: ClosrColors.ember,
-                    onPressed: (_isCreator || _canSend()) ? _sendText : null,
-                  ),
               ],
             ),
           ],
@@ -492,39 +529,23 @@ class _DateSeparator extends StatelessWidget {
         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
       ][m];
 
+  String _timeLabel(DateTime d) => DateFormat('h:mm a').format(d).toUpperCase();
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          const Expanded(child: Divider()),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(
-              _label,
-              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
-            ),
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Center(
+        child: Text(
+          '${_label.toUpperCase()} · ${_timeLabel(date)}',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            letterSpacing: 0.8,
           ),
-          const Expanded(child: Divider()),
-        ],
+        ),
       ),
-    );
-  }
-}
-
-class _MediaButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback? onTap;
-
-  const _MediaButton({required this.icon, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      icon: Icon(icon),
-      color: onTap != null ? ClosrColors.ember : Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(120),
-      onPressed: onTap,
     );
   }
 }
@@ -674,19 +695,31 @@ class _MultiMediaPreviewSheetState extends State<_MultiMediaPreviewSheet> {
                       decoration: InputDecoration(
                         hintText: count > 1 ? 'Add a caption for all…' : 'Add a caption…',
                         hintStyle: TextStyle(color: Colors.grey[500]),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: Colors.grey[700]!)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide(color: Colors.grey[700]!)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: Colors.white54)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        filled: false,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: BorderSide(color: Colors.grey[700]!)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: BorderSide(color: Colors.grey[700]!)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: const BorderSide(color: Colors.white54)),
+                        contentPadding: const EdgeInsets.only(left: 16, top: 10, bottom: 10),
+                        // Embedded ember send circle, same pattern as the chat input
+                        suffixIcon: Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: GestureDetector(
+                            onTap: _send,
+                            child: Container(
+                              width: 34,
+                              height: 34,
+                              decoration: const BoxDecoration(
+                                color: ClosrColors.ember,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.send_rounded, color: Colors.white, size: 16),
+                            ),
+                          ),
+                        ),
+                        suffixIconConstraints: const BoxConstraints(minWidth: 42, minHeight: 34),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.send, color: ClosrColors.paper),
-                  style: IconButton.styleFrom(backgroundColor: ClosrColors.ember),
-                  onPressed: _send,
                 ),
               ],
             ),

@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/stripe_service.dart';
 import 'package:closr_app/services/firestore_service.dart';
+import 'package:closr_app/widgets/circle_icon_button.dart';
+import 'package:closr_app/widgets/closr_card.dart';
 import 'package:closr_app/theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -27,7 +29,6 @@ class _WalletScreenState extends State<WalletScreen> {
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   bool _autoPayoutEnabled = false;
   bool _stripeConnectOnboarded = false;
-  String? _stripeConnectAccountId;
 
   bool _payoutLoading = false;
   bool _connectLoading = false;
@@ -39,13 +40,11 @@ class _WalletScreenState extends State<WalletScreen> {
     super.initState();
     _autoPayoutEnabled = widget.creator.autoPayoutEnabled;
     _stripeConnectOnboarded = widget.creator.stripeConnectOnboarded;
-    _stripeConnectAccountId = widget.creator.stripeConnectAccountId;
     _userSub = _firestoreService.streamUser(widget.creator.uid).listen((user) {
       if (user == null || !mounted) return;
       setState(() {
         _autoPayoutEnabled = user.autoPayoutEnabled;
         _stripeConnectOnboarded = user.stripeConnectOnboarded;
-        _stripeConnectAccountId = user.stripeConnectAccountId;
       });
     });
     _loadEarnings();
@@ -165,10 +164,7 @@ class _WalletScreenState extends State<WalletScreen> {
       'stripeConnectOnboarded': false,
       'updatedAt': FieldValue.serverTimestamp(),
     });
-    setState(() {
-      _stripeConnectOnboarded = false;
-      _stripeConnectAccountId = null;
-    });
+    setState(() => _stripeConnectOnboarded = false);
     await _handleConnectStripe();
   }
 
@@ -203,61 +199,84 @@ class _WalletScreenState extends State<WalletScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Wallet', style: TextStyle(fontWeight: FontWeight.bold)),
-        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: _loadEarnings,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            _buildEarningsCard(),
-            const SizedBox(height: 16),
-            _buildSubscriberBreakdown(),
-            const SizedBox(height: 16),
-            _buildPayoutSettings(),
-            const SizedBox(height: 16),
-            _buildStripeConnect(),
-            const SizedBox(height: 32),
-          ],
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              children: [
+                // ─── Header: earnings figure + month selector ─────────────
+                Text(
+                  'Earnings',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 15,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _loadingEarnings ? '€ …' : _fmt(_netCents),
+                  style: theme.textTheme.headlineLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircleIconButton(
+                      icon: Icons.chevron_left,
+                      size: 36,
+                      onTap: _prevMonth,
+                    ),
+                    Expanded(
+                      child: Text(
+                        _monthLabel(_selectedMonth),
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleSmall,
+                      ),
+                    ),
+                    CircleIconButton(
+                      icon: Icons.chevron_right,
+                      size: 36,
+                      onTap: _nextMonth,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildEarningsCard(),
+                const SizedBox(height: 16),
+                _buildSubscriberBreakdown(),
+                const SizedBox(height: 16),
+                _buildPayoutSettings(),
+                const SizedBox(height: 16),
+                _buildStripeConnect(),
+                const SizedBox(height: 32),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildEarningsCard() {
-    return _Card(
+    return ClosrCard(
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Month selector
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left),
-                onPressed: _prevMonth,
-                padding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
-              ),
-              Text(
-                _monthLabel(_selectedMonth),
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-              ),
-              IconButton(
-                icon: Icon(Icons.chevron_right,
-                    color: _selectedMonth.month == DateTime.now().month && _selectedMonth.year == DateTime.now().year
-                        ? Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(90)
-                        : null),
-                onPressed: _nextMonth,
-                padding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
-              ),
-            ],
-          ),
-          const Divider(height: 20),
           if (_loadingEarnings)
             const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
           else if (_earningsError != null)
@@ -297,14 +316,16 @@ class _WalletScreenState extends State<WalletScreen> {
   Widget _buildSubscriberBreakdown() {
     final entries = _monthEntries;
     if (entries.isEmpty && !_loadingEarnings) {
-      return _Card(
+      return ClosrCard(
+        padding: const EdgeInsets.all(20),
         child: Center(
           child: Text('No payments this month', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
         ),
       );
     }
     final visible = _showAllSubscribers ? entries : entries.take(3).toList();
-    return _Card(
+    return ClosrCard(
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -366,7 +387,8 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildPayoutSettings() {
-    return _Card(
+    return ClosrCard(
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -395,7 +417,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   _stripeConnectOnboarded
                       ? 'Payments sent to your Stripe Connect bank account'
                       : 'Connect your Stripe account to receive payouts',
-                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ),
             ],
@@ -407,27 +429,12 @@ class _WalletScreenState extends State<WalletScreen> {
               onPressed: (!_stripeConnectOnboarded || _payoutLoading)
                   ? null
                   : _handleRequestPayout,
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                side: BorderSide(
-                  color: _stripeConnectOnboarded
-                      ? Theme.of(context).colorScheme.onSurface
-                      : Theme.of(context).colorScheme.outline,
-                  width: 1.5,
-                ),
-              ),
               child: _payoutLoading
                   ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
                   : Text(
                       _stripeConnectOnboarded
                           ? 'Request Payout · ${_fmt(_totalNetAllTime)}'
                           : 'Connect Stripe first',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: _stripeConnectOnboarded
-                            ? Theme.of(context).colorScheme.onSurface
-                            : Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
                     ),
             ),
           ),
@@ -437,7 +444,8 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildStripeConnect() {
-    return _Card(
+    return ClosrCard(
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -462,10 +470,9 @@ class _WalletScreenState extends State<WalletScreen> {
                 child: OutlinedButton(
                   onPressed: _connectLoading ? null : _handleChangeStripeAccount,
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Theme.of(context).colorScheme.outline, width: 1.5),
                     foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                  child: Text('Change account', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                  child: const Text('Change account'),
                 ),
               ),
             ]),
@@ -484,34 +491,13 @@ class _WalletScreenState extends State<WalletScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 child: _connectLoading
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: ClosrColors.paper))
-                    : const Text('Connect Stripe Account', style: TextStyle(color: ClosrColors.paper, fontWeight: FontWeight.w600)),
+                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Connect Stripe Account'),
               ),
             ),
           ],
         ],
       ),
-    );
-  }
-}
-
-// ─── Reusable card ────────────────────────────────────────────────────────────
-
-class _Card extends StatelessWidget {
-  final Widget child;
-  const _Card({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: ClosrColors.ink.withAlpha(12), blurRadius: 12, offset: const Offset(0, 3))],
-      ),
-      child: child,
     );
   }
 }
@@ -539,38 +525,45 @@ class WalletConnectSuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       body: Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 80, height: 80,
-                decoration: BoxDecoration(color: ClosrColors.green.withAlpha(30), shape: BoxShape.circle),
-                child: const Icon(Icons.check_circle_outline, size: 48, color: ClosrColors.green),
-              ),
-              const SizedBox(height: 24),
-              const Text('Stripe account connected!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              Text(
-                'You can now request payouts directly to your bank account.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 15),
-              ),
-              const SizedBox(height: 40),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: ClosrCard(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 80, height: 80,
+                    decoration: BoxDecoration(color: ClosrColors.green.withAlpha(30), shape: BoxShape.circle),
+                    child: const Icon(Icons.check_circle_outline, size: 48, color: ClosrColors.green),
                   ),
-                  child: const Text('Back to Wallet', style: TextStyle(color: ClosrColors.paper, fontWeight: FontWeight.w600)),
-                ),
+                  const SizedBox(height: 24),
+                  Text('Stripe account connected!',
+                      style: theme.textTheme.titleMedium?.copyWith(fontSize: 20)),
+                  const SizedBox(height: 12),
+                  Text(
+                    'You can now request payouts directly to your bank account.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false),
+                      child: const Text('Back to Wallet'),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

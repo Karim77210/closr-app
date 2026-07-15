@@ -1,16 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:video_player/video_player.dart';
 import 'package:closr_app/models/message_model.dart';
 import 'package:closr_app/theme.dart';
 
+/// Chat bubble (Figma conversation): outgoing = ember with white text,
+/// incoming = white with shadow-xs. A 24px mini avatar sits at the outer
+/// bottom corner of the bubble when [avatar] is provided.
 class MessageBubble extends StatelessWidget {
   final Message message;
   final bool isMe;
   final bool showCaption;
   final VoidCallback? onMediaTap;
+  final Widget? avatar;
 
-  const MessageBubble({Key? key, required this.message, required this.isMe, this.showCaption = true, this.onMediaTap}) : super(key: key);
+  const MessageBubble({
+    Key? key,
+    required this.message,
+    required this.isMe,
+    this.showCaption = true,
+    this.onMediaTap,
+    this.avatar,
+  }) : super(key: key);
 
   BorderRadius _bubbleRadius() {
     // Outgoing (isMe): (20,20,20,6) · Incoming: (20,20,6,20)
@@ -26,52 +36,43 @@ class MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    // Incoming bubble surface: cream (light) / plum surface (dark)
-    final incomingColor = isDark ? theme.colorScheme.surface : ClosrColors.cream;
+    final incomingColor = theme.colorScheme.surface;
     final radius = _bubbleRadius();
 
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: EdgeInsets.only(
-          top: 4,
-          bottom: 4,
-          left: isMe ? 64 : 12,
-          right: isMe ? 12 : 64,
-        ),
-        decoration: BoxDecoration(
-          color: isMe ? ClosrColors.ember : incomingColor,
-          borderRadius: radius,
-        ),
-        child: ClipRRect(
-          borderRadius: radius,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              _buildContent(context),
-              Padding(
-                padding: const EdgeInsets.only(right: 10, bottom: 5, left: 10),
-                child: Text(
-                  DateFormat('HH:mm').format(message.timestamp),
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: isMe
-                        ? ClosrColors.paper.withAlpha(180)
-                        : theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+    final bubble = Container(
+      decoration: BoxDecoration(
+        color: isMe ? ClosrColors.ember : incomingColor,
+        borderRadius: radius,
+        boxShadow: !isMe && !isDark ? ClosrColors.shadowXs : null,
+      ),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: _buildContent(context),
+      ),
+    );
+
+    return Padding(
+      padding: EdgeInsets.only(
+        top: 4,
+        bottom: 4,
+        left: isMe ? 64 : 12,
+        right: isMe ? 12 : 64,
+      ),
+      child: Row(
+        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!isMe && avatar != null) ...[avatar!, const SizedBox(width: 6)],
+          Flexible(child: bubble),
+          if (isMe && avatar != null) ...[const SizedBox(width: 6), avatar!],
+        ],
       ),
     );
   }
 
   Widget _buildContent(BuildContext context) {
     final theme = Theme.of(context);
-    final textColor = isMe ? ClosrColors.paper : theme.colorScheme.onSurface;
+    final textColor = isMe ? Colors.white : theme.colorScheme.onSurface;
     switch (message.type) {
       case 'image':
         return GestureDetector(
@@ -113,7 +114,7 @@ class MessageBubble extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Text(
             message.content,
-            style: TextStyle(color: textColor, fontSize: 15),
+            style: TextStyle(color: textColor, fontSize: 14, height: 1.35),
           ),
         );
     }
@@ -139,7 +140,7 @@ class _ImageMessage extends StatelessWidget {
                 width: 200, height: 150,
                 child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
               ),
-        errorBuilder: (_, __, ___) => SizedBox(
+        errorBuilder: (_, __, ___) => const SizedBox(
           width: 80, height: 80,
           child: Center(child: Icon(Icons.broken_image, size: 40, color: ClosrColors.muted)),
         ),
@@ -196,7 +197,7 @@ class _VideoMessageState extends State<_VideoMessage> {
                     shape: BoxShape.circle,
                   ),
                   padding: const EdgeInsets.all(14),
-                  child: const Icon(Icons.play_arrow, color: ClosrColors.paper, size: 36),
+                  child: const Icon(Icons.play_arrow, color: Colors.white, size: 36),
                 ),
               ],
             )

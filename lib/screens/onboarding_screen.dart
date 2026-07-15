@@ -1,11 +1,17 @@
 import 'dart:math';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show Uint8List;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:closr_app/main.dart' show PendingNavigation;
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/auth_service.dart';
 import 'package:closr_app/widgets/loading_overlay.dart';
+import 'package:closr_app/widgets/closr_card.dart';
+import 'package:closr_app/widgets/error_banner.dart';
+import 'package:closr_app/widgets/grouped_list.dart';
+import 'package:closr_app/widgets/labeled_field.dart';
+import 'package:closr_app/widgets/page_heading.dart';
+import 'package:closr_app/widgets/upload_card.dart';
 import 'package:closr_app/theme.dart';
 
 const _funNames = [
@@ -156,8 +162,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       setState(() => _errorMessage = 'Bio must be 100 characters or fewer.');
       return;
     }
-    if (price < 20) {
-      setState(() => _errorMessage = 'Subscription price must be at least 20 EUR.' );
+    if (price <= 0) {
+      setState(() => _errorMessage = 'Subscription price must be greater than 0.' );
       return;
     }
     if (limit <= 0) {
@@ -199,17 +205,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
   }
 
+  String get _greetingName {
+    final username = _usernameController.text.trim();
+    if (username.isNotEmpty) return '@$username';
+    return _displayNameController.text.trim().isNotEmpty
+        ? _displayNameController.text.trim()
+        : widget.displayName;
+  }
+
+  ImageProvider? get _avatarPreview {
+    if (_profileImageData != null) return MemoryImage(_profileImageData!);
+    if (widget.photoUrl != null) return NetworkImage(widget.photoUrl!);
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Onboarding'),
-        elevation: 0,
-        leading: _selectedRole != null
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
+      appBar: _selectedRole != null
+          ? AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, size: 20),
                 onPressed: _isLoading
                     ? null
                     : () {
@@ -218,154 +234,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           _errorMessage = null;
                         });
                       },
-              )
-            : null,
-      ),
+              ),
+            )
+          : null,
       body: LoadingOverlay(
         isLoading: _isLoading,
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: isMobile ? 16 : 48,
-            vertical: 24,
-          ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 600),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Welcome, ${widget.displayName}!',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    _selectedRole == null
-                        ? 'Choose your account type'
-                        : _selectedRole == UserRole.creator
-                            ? 'Set up your creator page'
-                            : 'Finish setting up your subscriber account',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  if (_errorMessage != null)
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: ClosrColors.rose.withAlpha(28),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: ClosrColors.rose.withAlpha(90)),
-                      ),
-                      child: Text(
-                        _errorMessage!,
-                        style: const TextStyle(color: ClosrColors.rose),
-                      ),
-                    ),
-                  if (_errorMessage != null) const SizedBox(height: 20),
-
-                  if (_selectedRole == null) ...[
-                    _buildRoleCard(
-                      context,
-                      role: UserRole.creator,
-                      title: 'I\'m a Creator',
-                      description: 'Monetize your audience with paid subscribers.',
-                      icon: Icons.star_outlined,
-                      iconColor: ClosrColors.ember,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildRoleCard(
-                      context,
-                      role: UserRole.subscriber,
-                      title: 'I\'m a Subscriber',
-                      description: 'Connect with creators you admire.',
-                      icon: Icons.favorite_outlined,
-                      iconColor: ClosrColors.rose,
-                    ),
-                  ] else if (_selectedRole == UserRole.creator) ...[
-                    _buildUploadPhotoCard(context),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _displayNameController,
-                      label: 'Display name',
-                      hint: 'Your name or anything you like',
-                    ),
-                    // Show username only for Google users (email users set it at signup)
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _bioController,
-                      label: 'Short bio',
-                      hint: 'Tell subscribers what you offer (100 chars max)',
-                      maxLength: 100,
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _priceController,
-                      label: 'Subscription price (EUR)',
-                      hint: '20 - 150 suggested',
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _limitController,
-                      label: 'Subscriber limit',
-                      hint: 'Default 50',
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _messageCharsController,
-                      label: 'Message character limit',
-                      hint: 'Default 300',
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _messageCooldownController,
-                      label: 'Cooldown between messages (sec)',
-                      hint: 'Default 20',
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _messageDailyController,
-                      label: 'Max messages per day',
-                      hint: 'Default 10',
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _submitCreatorProfile,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text('Complete Creator Setup'),
-                    ),
-                  ] else ...[
-                    _buildUploadPhotoCard(context),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _displayNameController,
-                      label: 'Display name',
-                      hint: 'Your name or anything you like',
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _submitSubscriberProfile,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text('Complete Setup'),
-                    ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_selectedRole == null)
+                      ..._buildRoleStep(context)
+                    else
+                      ..._buildFormStep(context),
                   ],
-                ],
+                ),
               ),
             ),
           ),
@@ -374,66 +262,131 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildUploadPhotoCard(BuildContext context) {
-    return GestureDetector(
-      onTap: _isLoading ? null : _pickProfileImage,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Theme.of(context).colorScheme.outline),
-          color: Theme.of(context).colorScheme.surface,
-        ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: ClosrColors.emberSoft,
-              backgroundImage: _profileImageData != null
-                  ? MemoryImage(_profileImageData!) as ImageProvider<Object>
-                  : (widget.photoUrl != null ? NetworkImage(widget.photoUrl!) : null) as ImageProvider<Object>?,
-              child: _profileImage == null && widget.photoUrl == null
-                  ? const Icon(Icons.camera_alt_outlined, color: ClosrColors.ink)
-                  : null,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text('Upload a profile picture', style: TextStyle(fontWeight: FontWeight.bold)),
-                  SizedBox(height: 4),
-                  Text('Choose a photo for your public creator page.'),
-                ],
-              ),
-            ),
-            const Icon(Icons.edit, color: ClosrColors.ember),
-          ],
-        ),
+  // ─── Step 1: account type (onboarding1) ──────────────────────────────────
+  List<Widget> _buildRoleStep(BuildContext context) {
+    return [
+      const SizedBox(height: 48),
+      PageHeading(
+        'Nice to meet you,\n$_greetingName!',
+        color: ClosrColors.ember,
+        textAlign: TextAlign.center,
       ),
-    );
+      const SizedBox(height: 24),
+      if (_errorMessage != null) ...[
+        ErrorBanner(_errorMessage!),
+        const SizedBox(height: 8),
+      ],
+      const SectionTitle('Choose your account type'),
+      _buildRoleCard(
+        context,
+        role: UserRole.creator,
+        title: 'Creator',
+        description: 'Monetize your audience\nwith paid subscribers.',
+        icon: Icons.star_outline,
+      ),
+      const SizedBox(height: 16),
+      _buildRoleCard(
+        context,
+        role: UserRole.subscriber,
+        title: 'Subscriber',
+        description: 'Connect and support\nthe creators you love!',
+        icon: Icons.person_outline,
+      ),
+    ];
   }
 
-  Widget _buildTextField(
-    {
-      required TextEditingController controller,
-      required String label,
-      String? hint,
-      TextInputType keyboardType = TextInputType.text,
-      int maxLines = 1,
-      int? maxLength,
-    }
-  ) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      maxLines: maxLines,
-      maxLength: maxLength,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
+  // ─── Step 2: profile form (onboarding2) ──────────────────────────────────
+  List<Widget> _buildFormStep(BuildContext context) {
+    final theme = Theme.of(context);
+    final isCreator = _selectedRole == UserRole.creator;
+
+    return [
+      const SizedBox(height: 8),
+      PageHeading(
+        'Tell us more...',
+        color: ClosrColors.ember,
+        textAlign: TextAlign.center,
       ),
-    );
+      const SizedBox(height: 12),
+      Text(
+        'We need a few more details\nto set up your account :',
+        textAlign: TextAlign.center,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+      const SizedBox(height: 16),
+      if (_errorMessage != null) ...[
+        ErrorBanner(_errorMessage!),
+        const SizedBox(height: 8),
+      ],
+      const SectionTitle('Profil'),
+      UploadCard(
+        onTap: _isLoading ? null : _pickProfileImage,
+        preview: _avatarPreview,
+      ),
+      const SizedBox(height: 24),
+      LabeledField(
+        label: 'Display name',
+        controller: _displayNameController,
+        hint: _funNameHint,
+      ),
+      if (isCreator) ...[
+        const SizedBox(height: 16),
+        LabeledField(
+          label: 'Bio',
+          controller: _bioController,
+          hint: 'Coach and content creator...',
+          maxLines: 3,
+          maxLength: 100,
+        ),
+        SectionTitle('Default tchat settings', padding: const EdgeInsets.only(top: 8, bottom: 4)),
+        Text(
+          'You will be able to change settings for each conversations later.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 16),
+        LabeledField(
+          label: 'Subscription price',
+          controller: _priceController,
+          keyboardType: TextInputType.number,
+        ),
+        const SizedBox(height: 16),
+        LabeledField(
+          label: 'Number of paid 1:1 conversations',
+          controller: _limitController,
+          keyboardType: TextInputType.number,
+        ),
+        const SizedBox(height: 16),
+        LabeledField(
+          label: 'Message character limit',
+          controller: _messageCharsController,
+          keyboardType: TextInputType.number,
+        ),
+        const SizedBox(height: 16),
+        LabeledField(
+          label: 'Cooldown between messages (sec)',
+          controller: _messageCooldownController,
+          keyboardType: TextInputType.number,
+        ),
+        const SizedBox(height: 16),
+        LabeledField(
+          label: 'Max messages per day',
+          controller: _messageDailyController,
+          keyboardType: TextInputType.number,
+        ),
+      ],
+      const SizedBox(height: 32),
+      ElevatedButton(
+        onPressed: _isLoading
+            ? null
+            : (isCreator ? _submitCreatorProfile : _submitSubscriberProfile),
+        child: const Text('Start chatting'),
+      ),
+      const SizedBox(height: 24),
+    ];
   }
 
   Widget _buildRoleCard(
@@ -442,71 +395,38 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     required String title,
     required String description,
     required IconData icon,
-    required Color iconColor,
   }) {
-    final isSelected = _selectedRole == role;
+    final theme = Theme.of(context);
 
-    return GestureDetector(
+    return ClosrCard(
       onTap: _isLoading ? null : () => _handleSelectRole(role),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? ClosrColors.emberSoft.withAlpha(70)
-              : Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? ClosrColors.ember : Theme.of(context).colorScheme.outline,
-            width: isSelected ? 2 : 1,
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: ClosrColors.ember, size: 28),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: ClosrColors.ember,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: iconColor.withAlpha((0.1 * 255).round()),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: iconColor, size: 28),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-            if (isSelected)
-              Container(
-                width: 24,
-                height: 24,
-                decoration: const BoxDecoration(
-                  color: ClosrColors.ember,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check,
-                  color: ClosrColors.paper,
-                  size: 16,
-                ),
-              ),
-          ],
-        ),
+        ],
       ),
     );
   }

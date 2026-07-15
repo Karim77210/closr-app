@@ -1,12 +1,15 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/auth_service.dart';
 import 'package:closr_app/widgets/loading_overlay.dart';
+import 'package:closr_app/widgets/error_banner.dart';
+import 'package:closr_app/widgets/grouped_list.dart';
+import 'package:closr_app/widgets/labeled_field.dart';
+import 'package:closr_app/widgets/page_heading.dart';
 import 'package:closr_app/theme.dart';
 
+/// Creator pricing & default chat settings. Profile fields (photo, name,
+/// username, bio) live in [EditProfileScreen] — no duplicates.
 class CreatorSettingsScreen extends StatefulWidget {
   final AppUser user;
 
@@ -18,27 +21,18 @@ class CreatorSettingsScreen extends StatefulWidget {
 
 class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
   final _authService = AuthService();
-  final _imagePicker = ImagePicker();
-  final _displayNameController = TextEditingController();
-  final _usernameController = TextEditingController();
-  final _bioController = TextEditingController();
   final _priceController = TextEditingController();
   final _limitController = TextEditingController();
   final _messageCharsController = TextEditingController();
   final _messageCooldownController = TextEditingController();
   final _messageDailyController = TextEditingController();
 
-  XFile? _profileImage;
-  Uint8List? _profileImageData;
   bool _isLoading = false;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _displayNameController.text = widget.user.displayName;
-    _usernameController.text = widget.user.username;
-    _bioController.text = widget.user.bio;
     _priceController.text = (widget.user.subscriptionPriceCents / 100).toStringAsFixed(0);
     _limitController.text = widget.user.subscriberLimit > 0 ? widget.user.subscriberLimit.toString() : '50';
     _messageCharsController.text = widget.user.messageCharacterLimit.toString();
@@ -48,9 +42,6 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
 
   @override
   void dispose() {
-    _displayNameController.dispose();
-    _usernameController.dispose();
-    _bioController.dispose();
     _priceController.dispose();
     _limitController.dispose();
     _messageCharsController.dispose();
@@ -59,42 +50,15 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
     super.dispose();
   }
 
-  Future<void> _pickProfileImage() async {
-    final picked = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1200,
-      maxHeight: 1200,
-      imageQuality: 80,
-    );
-    if (picked != null) {
-      final bytes = await picked.readAsBytes();
-      setState(() {
-        _profileImage = picked;
-        _profileImageData = bytes;
-      });
-    }
-  }
-
   Future<void> _saveSettings() async {
-    final displayName = _displayNameController.text.trim();
-    final username = _usernameController.text.trim().toLowerCase();
-    final bio = _bioController.text.trim();
     final price = int.tryParse(_priceController.text.trim()) ?? 0;
     final limit = int.tryParse(_limitController.text.trim()) ?? 0;
     final messageChars = int.tryParse(_messageCharsController.text.trim()) ?? 300;
     final cooldown = int.tryParse(_messageCooldownController.text.trim()) ?? 20;
     final daily = int.tryParse(_messageDailyController.text.trim()) ?? 10;
 
-    if (username.isEmpty) {
-      setState(() => _errorMessage = 'Username cannot be empty.');
-      return;
-    }
-    if (bio.length > 100) {
-      setState(() => _errorMessage = 'Bio must be 100 characters or fewer.');
-      return;
-    }
-    if (price < 20) {
-      setState(() => _errorMessage = 'Subscription price must be at least 20 EUR.');
+    if (price <= 0) {
+      setState(() => _errorMessage = 'Subscription price must be greater than 0.');
       return;
     }
     if (limit <= 0) {
@@ -110,15 +74,11 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
     try {
       await _authService.updateUserProfile(
         uid: widget.user.uid,
-        displayName: displayName.isNotEmpty ? displayName : null,
-        username: username,
-        bio: bio,
         subscriptionPriceCents: price * 100,
         subscriberLimit: limit,
         messageCharacterLimit: messageChars,
         messageCooldownSeconds: cooldown,
         maxMessagesPerDay: daily,
-        photoFile: _profileImage,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -137,110 +97,82 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-    final photoProvider = _profileImageData != null
-        ? MemoryImage(_profileImageData!) as ImageProvider
-        : (widget.user.photoUrl?.isNotEmpty == true ? NetworkImage(widget.user.photoUrl!) : null);
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Creator Settings'),
-        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
       body: LoadingOverlay(
         isLoading: _isLoading,
         child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: isMobile ? 16 : 40,
-            vertical: 24,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 700),
+              constraints: const BoxConstraints(maxWidth: 480),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildUploadPhotoCard(context, photoProvider),
-                  const SizedBox(height: 20),
-                  _buildTextField(
-                    controller: _displayNameController,
-                    label: 'Full name',
-                    hint: 'Your first and last name',
+                  const PageHeading(
+                    'Creator settings',
+                    color: ClosrColors.ember,
+                    textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    controller: _usernameController,
-                    label: 'Username',
-                    hint: 'Your public creator username',
+                  const SizedBox(height: 12),
+                  Text(
+                    'Your pricing and default conversation limits.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    controller: _bioController,
-                    label: 'Bio',
-                    hint: 'Short introduction (100 chars max)',
-                    maxLines: 3,
-                    maxLength: 100,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
+                  const SizedBox(height: 8),
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 8),
+                    ErrorBanner(_errorMessage!),
+                  ],
+                  const SectionTitle('Pricing'),
+                  LabeledField(
+                    label: 'Subscription price',
                     controller: _priceController,
-                    label: 'Subscription price (EUR)',
-                    hint: 'Minimum 20 EUR',
+                    hint: 'e.g. 20',
                     keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 16),
-                  _buildTextField(
+                  LabeledField(
+                    label: 'Number of paid 1:1 conversations',
                     controller: _limitController,
-                    label: 'Subscriber limit',
                     hint: 'Suggested 50',
                     keyboardType: TextInputType.number,
                   ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
+                  const SectionTitle('Default tchat settings'),
+                  LabeledField(
+                    label: 'Message character limit',
                     controller: _messageCharsController,
-                    label: 'Character limit per message',
                     hint: 'Default 300',
                     keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 16),
-                  _buildTextField(
-                    controller: _messageCooldownController,
+                  LabeledField(
                     label: 'Cooldown between messages (sec)',
+                    controller: _messageCooldownController,
                     hint: 'Default 20',
                     keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 16),
-                  _buildTextField(
-                    controller: _messageDailyController,
+                  LabeledField(
                     label: 'Max messages per day',
+                    controller: _messageDailyController,
                     hint: 'Default 10',
                     keyboardType: TextInputType.number,
                   ),
-                  const SizedBox(height: 24),
-                  if (_errorMessage != null)
-                    Column(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: ClosrColors.rose.withAlpha(28),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: ClosrColors.rose.withAlpha(90)),
-                          ),
-                          child: Text(
-                            _errorMessage!,
-                            style: const TextStyle(color: ClosrColors.rose),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-                    ),
+                  const SizedBox(height: 32),
                   ElevatedButton(
                     onPressed: _isLoading ? null : _saveSettings,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: const Text('Save Creator Settings'),
+                    child: const Text('Save settings'),
                   ),
                   const SizedBox(height: 24),
                 ],
@@ -248,62 +180,6 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildUploadPhotoCard(BuildContext context, ImageProvider? imageProvider) {
-    return GestureDetector(
-      onTap: _pickProfileImage,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Theme.of(context).colorScheme.outline),
-          color: Theme.of(context).colorScheme.surface,
-        ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 30,
-              backgroundColor: ClosrColors.emberSoft,
-              backgroundImage: imageProvider,
-              child: imageProvider == null ? const Icon(Icons.camera_alt_outlined, color: ClosrColors.ink) : null,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text('Update profile picture', style: TextStyle(fontWeight: FontWeight.bold)),
-                  SizedBox(height: 4),
-                  Text('This appears on your public creator page.'),
-                ],
-              ),
-            ),
-            const Icon(Icons.edit, color: ClosrColors.ember),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    String? hint,
-    TextInputType keyboardType = TextInputType.text,
-    int maxLines = 1,
-    int? maxLength,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      maxLines: maxLines,
-      maxLength: maxLength,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
       ),
     );
   }

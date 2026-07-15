@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,6 +7,7 @@ import 'package:closr_app/models/message_model.dart';
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/firestore_service.dart';
 import 'package:closr_app/services/storage_service.dart';
+import 'package:closr_app/widgets/circle_icon_button.dart';
 import 'package:closr_app/theme.dart';
 
 class BroadcastScreen extends StatefulWidget {
@@ -27,9 +27,6 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
 
   List<XFile> _mediaFiles = [];
   int _previewIndex = 0;
-  Uint8List? _firstPreviewBytes;
-  VideoPlayerController? _firstVideoController;
-  bool _firstVideoInitialized = false;
 
   bool _isSending = false;
   bool _isUploading = false;
@@ -39,7 +36,6 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
   @override
   void dispose() {
     _textController.dispose();
-    _firstVideoController?.dispose();
     super.dispose();
   }
 
@@ -52,36 +48,16 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
     final files = await _imagePicker.pickMultipleMedia();
     if (files.isEmpty) return;
 
-    _firstVideoController?.dispose();
-    _firstVideoController = null;
-    _firstVideoInitialized = false;
-
     setState(() {
       _mediaFiles = files;
       _previewIndex = 0;
-      _firstPreviewBytes = null;
     });
-
-    final first = files.first;
-    if (!_isVideoFile(first)) {
-      final bytes = await first.readAsBytes();
-      if (mounted) setState(() => _firstPreviewBytes = bytes);
-    } else {
-      final ctrl = VideoPlayerController.networkUrl(Uri.parse(first.path))
-        ..initialize().then((_) {
-          if (mounted) setState(() => _firstVideoInitialized = true);
-        });
-      setState(() => _firstVideoController = ctrl);
-    }
   }
 
   void _removeMedia() {
-    _firstVideoController?.dispose();
     setState(() {
       _mediaFiles = [];
-      _firstPreviewBytes = null;
-      _firstVideoController = null;
-      _firstVideoInitialized = false;
+      _previewIndex = 0;
     });
   }
 
@@ -136,6 +112,10 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          onPressed: _isSending ? null : () => Navigator.of(context).pop(),
+        ),
         title: const Text('Broadcast'),
         elevation: 0,
         actions: [
@@ -177,20 +157,41 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
                 // Media preview
                 if (_mediaFiles.isNotEmpty) _buildMediaPreview(),
 
-                // Recipient badge
-                Container(
-                  width: double.infinity,
-                  color: ClosrColors.emberSoft.withAlpha(90),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  child: Row(
-                    children: const [
-                      Icon(Icons.group_outlined, size: 18, color: ClosrColors.ember),
-                      SizedBox(width: 8),
-                      Text(
-                        'All active subscribers',
-                        style: TextStyle(color: ClosrColors.ember, fontWeight: FontWeight.w500, fontSize: 13),
+                // Recipient badge (ember-subtle pill, Figma premium badge style)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? ClosrColors.darkEmberSubtle
+                            : ClosrColors.emberSoft,
+                        borderRadius: BorderRadius.circular(999),
                       ),
-                    ],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.group_outlined,
+                              size: 16,
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? ClosrColors.emberSoft
+                                  : ClosrColors.emberHover),
+                          const SizedBox(width: 8),
+                          Text(
+                            'All active subscribers',
+                            style: TextStyle(
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? ClosrColors.emberSoft
+                                  : ClosrColors.emberHover,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
 
@@ -225,19 +226,17 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
 
                 // Media buttons
                 SafeArea(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outline)),
-                    ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     child: Row(
                       children: [
-                        IconButton(
-                          icon: const Icon(Icons.perm_media_outlined),
-                          color: ClosrColors.ember,
-                          onPressed: _pickMedia,
-                          tooltip: 'Add photos / videos',
+                        CircleIconButton(
+                          icon: Icons.add_photo_alternate_outlined,
+                          shape: CircleIconButtonShape.squircle,
+                          size: 42,
+                          onTap: _pickMedia,
                         ),
+                        const SizedBox(width: 10),
                         if (_mediaFiles.isNotEmpty)
                           Text(
                             '${_mediaFiles.length} file${_mediaFiles.length > 1 ? 's' : ''} selected',

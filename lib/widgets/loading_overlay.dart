@@ -21,7 +21,7 @@ class LoadingOverlay extends StatelessWidget {
         if (isLoading)
           Positioned.fill(
             child: Container(
-              color: ClosrColors.plum.withAlpha((0.45 * 255).round()),
+              color: ClosrColors.ink.withAlpha((0.45 * 255).round()),
               child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -34,7 +34,7 @@ class LoadingOverlay extends StatelessWidget {
                       Text(
                         message!,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: ClosrColors.paper,
+                              color: Colors.white,
                               fontWeight: FontWeight.w500,
                             ),
                       ),

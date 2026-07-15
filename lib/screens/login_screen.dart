@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:sign_in_button/sign_in_button.dart';
 import 'package:closr_app/main.dart' show PendingNavigation;
 import 'package:closr_app/services/auth_service.dart';
 import 'package:closr_app/services/firestore_service.dart';
 import 'package:closr_app/widgets/loading_overlay.dart';
+import 'package:closr_app/widgets/labeled_field.dart';
+import 'package:closr_app/widgets/error_banner.dart';
 import 'package:closr_app/theme.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -103,172 +106,151 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
 
     return Scaffold(
       body: LoadingOverlay(
         isLoading: _isLoading,
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // ─── Cover header (full-bleed plum gradient) ──────────────────
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.fromLTRB(
-                  24,
-                  MediaQuery.of(context).padding.top + 56,
-                  24,
-                  56,
-                ),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [ClosrColors.plum, ClosrColors.darkBackground],
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    const ClosrLogoMark(size: 72),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Closr',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                            color: ClosrColors.paper,
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Connect with creators you value',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: ClosrColors.emberSoft,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 48),
 
-              // ─── Form ─────────────────────────────────────────────────────
-              Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isMobile ? 16 : 48,
-                  vertical: 32,
-                ),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 400),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (_errorMessage != null)
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: ClosrColors.rose.withAlpha(28),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: ClosrColors.rose.withAlpha(90)),
-                            ),
-                            child: Text(
-                              _errorMessage!,
-                              style: const TextStyle(color: ClosrColors.rose, fontSize: 14),
+                      // ─── Logo lockup ─────────────────────────────────────
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const ClosrLogoMark(size: 56),
+                          const SizedBox(width: 16),
+                          Text(
+                            'Closr',
+                            style: theme.textTheme.headlineLarge?.copyWith(
+                              fontSize: 40,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        if (_errorMessage != null) const SizedBox(height: 16),
-
-                        TextField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(
-                            labelText: 'Email',
-                            prefixIcon: Icon(Icons.email_outlined),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Username — only on sign up
-                        if (_isSignUp) ...[
-                          TextField(
-                            controller: _usernameController,
-                            decoration: const InputDecoration(
-                              labelText: 'Username',
-                              hintText: 'yourname',
-                              prefixText: '@',
-                              prefixIcon: Icon(Icons.alternate_email),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
                         ],
-
-                        TextField(
-                          controller: _passwordController,
-                          obscureText: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Password',
-                            prefixIcon: Icon(Icons.lock_outlined),
-                          ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Paid messaging app.',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: ClosrColors.ember,
                         ),
-                        const SizedBox(height: 24),
+                      ),
+                      const SizedBox(height: 40),
+                      Text(
+                        _isSignUp
+                            ? 'Sign up by entering your details.'
+                            : 'Welcome back! Please enter your details.',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
 
-                        ElevatedButton(
-                          onPressed: _isLoading
-                              ? null
-                              : (_isSignUp ? _handleSignUp : _handleSignInWithEmail),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: Text(
-                            _isSignUp ? 'Create Account' : 'Sign In',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                          ),
+                      if (_errorMessage != null) ...[
+                        ErrorBanner(_errorMessage!),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // ─── Form ────────────────────────────────────────────
+                      LabeledField(
+                        label: 'Email',
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        hint: 'olivia.r@closr.com',
+                        autofillHints: const [AutofillHints.email],
+                      ),
+                      const SizedBox(height: 16),
+
+                      if (_isSignUp) ...[
+                        LabeledField(
+                          label: 'Username',
+                          controller: _usernameController,
+                          hint: '@username',
                         ),
                         const SizedBox(height: 16),
+                      ],
 
-                        TextButton(
-                          onPressed: _isLoading
+                      LabeledField(
+                        label: 'Password',
+                        controller: _passwordController,
+                        obscureText: true,
+                        hint: '••••••••',
+                        onSubmitted: (_) => _isSignUp ? _handleSignUp() : _handleSignInWithEmail(),
+                      ),
+                      const SizedBox(height: 32),
+
+                      ElevatedButton(
+                        onPressed: _isLoading
+                            ? null
+                            : (_isSignUp ? _handleSignUp : _handleSignInWithEmail),
+                        child: Text(_isSignUp ? 'Sign up' : 'Sign in'),
+                      ),
+                      const SizedBox(height: 12),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: SignInButton(
+                          Buttons.google,
+                          text: _isSignUp ? 'Sign up with Google' : 'Sign in with Google',
+                          onPressed: _handleSignInWithGoogle,
+                          elevation: 0,
+                          shape: StadiumBorder(
+                            side: BorderSide(color: theme.colorScheme.outline),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // ─── Toggle footer ───────────────────────────────────
+                      Center(
+                        child: GestureDetector(
+                          onTap: _isLoading
                               ? null
                               : () => setState(() {
                                     _isSignUp = !_isSignUp;
                                     _errorMessage = null;
                                   }),
-                          child: Text(
-                            _isSignUp ? 'Already have an account? Sign in' : 'Don\'t have an account? Sign up',
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
-                        Row(
-                          children: [
-                            const Expanded(child: Divider()),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text('or', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+                          child: Text.rich(
+                            TextSpan(
+                              text: _isSignUp
+                                  ? 'Already have an account? '
+                                  : 'Don\'t have an account? ',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: _isSignUp ? 'Sign in' : 'Sign up',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: ClosrColors.ember,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const Expanded(child: Divider()),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-
-                        OutlinedButton.icon(
-                          onPressed: _isLoading ? null : _handleSignInWithGoogle,
-                          icon: const Icon(Icons.login),
-                          label: const Text('Continue with Google'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
                           ),
                         ),
-                        const SizedBox(height: 40),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
                   ),
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),

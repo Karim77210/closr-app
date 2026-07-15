@@ -6,6 +6,10 @@ import 'package:closr_app/services/firestore_service.dart';
 import 'package:closr_app/services/stripe_service.dart';
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/models/subscription_model.dart';
+import 'package:closr_app/widgets/closr_avatar.dart';
+import 'package:closr_app/widgets/closr_card.dart';
+import 'package:closr_app/widgets/grouped_list.dart';
+import 'package:closr_app/widgets/page_heading.dart';
 import 'package:closr_app/theme.dart';
 
 class CreatorPublicPage extends StatefulWidget {
@@ -44,10 +48,18 @@ class _CreatorPublicPageState extends State<CreatorPublicPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.username),
-        elevation: 0,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ClosrLogoMark(size: 28),
+            const SizedBox(width: 10),
+            Text('Closr', style: theme.textTheme.titleMedium),
+          ],
+        ),
       ),
       body: FutureBuilder<AppUser?>(
         future: _firestoreService.getCreatorByUsername(widget.username),
@@ -77,81 +89,45 @@ class _CreatorPublicPageState extends State<CreatorPublicPage> {
               : 'Free';
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
+                constraints: const BoxConstraints(maxWidth: 480),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 8),
-                    // Plum gradient header with ember-ringed avatar
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [ClosrColors.plum, ClosrColors.darkBackground],
-                        ),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: Column(
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: ClosrColors.ember, width: 3),
-                            ),
-                            padding: const EdgeInsets.all(3),
-                            child: CircleAvatar(
-                              radius: 56,
-                              backgroundColor: ClosrColors.emberSoft,
-                              backgroundImage: creator.photoUrl != null && creator.photoUrl!.isNotEmpty
-                                  ? NetworkImage(creator.photoUrl!) as ImageProvider
-                                  : null,
-                              child: creator.photoUrl == null || creator.photoUrl!.isEmpty
-                                  ? Text(
-                                      creator.displayName.isNotEmpty
-                                          ? creator.displayName[0].toUpperCase()
-                                          : widget.username[0].toUpperCase(),
-                                      style: const TextStyle(fontSize: 40, color: ClosrColors.ink),
-                                    )
-                                  : null,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          Text(
-                            '${widget.username} invites you to chat privately.',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: ClosrColors.paper,
-                                ),
-                          ),
-                        ],
+                    ClosrAvatar(
+                      photoUrl: creator.photoUrl?.isNotEmpty == true ? creator.photoUrl : null,
+                      initialSource: creator.displayName.isNotEmpty
+                          ? creator.displayName
+                          : widget.username,
+                      size: 92,
+                      ring: true,
+                    ),
+                    const SizedBox(height: 20),
+                    PageHeading(
+                      creator.displayName,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '@${widget.username}',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: ClosrColors.ember,
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Bio',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '${widget.username} invites you to chat privately.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(shortBio, style: Theme.of(context).textTheme.bodyMedium),
+                    const SectionTitle('Bio'),
+                    ClosrCard(
+                      child: Text(shortBio, style: theme.textTheme.bodyMedium),
                     ),
                     const SizedBox(height: 24),
                     Row(
@@ -159,21 +135,27 @@ class _CreatorPublicPageState extends State<CreatorPublicPage> {
                       children: [
                         Text(
                           'Subscription',
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                        Text(
-                          priceLabel,
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
-                        ),
+                        Text(priceLabel, style: theme.textTheme.titleMedium),
                       ],
                     ),
                     const SizedBox(height: 24),
                     _buildActionSection(context, creator, isFull),
-                    const SizedBox(height: 32),
-                    _buildStatTile(
-                      context,
-                      'Subscribers',
-                      '${creator.subscriberCount} / ${creator.subscriberLimit > 0 ? creator.subscriberLimit : '∞'}',
+                    const SizedBox(height: 24),
+                    ClosrCard(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Subscribers', style: theme.textTheme.titleSmall),
+                          Text(
+                            '${creator.subscriberCount} / ${creator.subscriberLimit > 0 ? creator.subscriberLimit : '∞'}',
+                            style: theme.textTheme.titleMedium,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -256,70 +238,55 @@ class _CreatorPublicPageState extends State<CreatorPublicPage> {
       width: double.infinity,
       child: ElevatedButton(
         onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-        ),
         child: isLoading
             ? const SizedBox(
                 height: 20,
                 width: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: ClosrColors.paper),
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
               )
-            : Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            : Text(label),
       ),
     );
   }
 
   Widget _buildFullBadge() {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
-        color: ClosrColors.line,
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(999),
       ),
-      child: const Text(
+      child: Text(
         'Full',
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: ClosrColors.muted),
-      ),
-    );
-  }
-
-  Widget _buildStatTile(BuildContext context, String label, String value) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Theme.of(context).colorScheme.outline),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.bodyLarge),
-          Text(value, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
-        ],
+        style: theme.textTheme.labelLarge?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
       ),
     );
   }
 
   Widget _buildNotFound(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.search_off_outlined, size: 64, color: ClosrColors.muted),
+            Icon(Icons.search_off_outlined, size: 64, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(height: 16),
-            Text('Creator not found', textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineSmall),
+            Text('Creator not found',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleMedium?.copyWith(fontSize: 20)),
             const SizedBox(height: 8),
             Text(
               'No active creator matches this username.',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -334,7 +301,7 @@ class _CreatorPublicPageState extends State<CreatorPublicPage> {
         child: Text(
           message,
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: ClosrColors.rose),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: ClosrColors.rose),
         ),
       ),
     );

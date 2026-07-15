@@ -3,8 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:closr_app/models/subscription_model.dart';
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/firestore_service.dart';
-import 'package:closr_app/screens/broadcast_screen.dart';
 import 'package:closr_app/screens/chat_screen.dart';
+import 'package:closr_app/widgets/closr_avatar.dart';
 import 'package:closr_app/theme.dart';
 import 'package:intl/intl.dart';
 
@@ -17,21 +17,22 @@ class DiscussionsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isCreator = user.role == UserRole.creator;
 
-    return Scaffold(
-      floatingActionButton: isCreator
-          ? FloatingActionButton.extended(
-              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => BroadcastScreen(creator: user),
-              )),
-              icon: const Icon(Icons.campaign_outlined),
-              label: const Text('Broadcast'),
-            )
-          : null,
-      body: isCreator
-          ? _CreatorInbox(creator: user)
-          : _SubscriberInbox(subscriber: user),
-    );
+    return isCreator
+        ? _CreatorInbox(creator: user)
+        : _SubscriberInbox(subscriber: user);
   }
+}
+
+/// Figma time label: "17:00" today, "SATURDAY" within a week, else "12/07".
+String? conversationTimeLabel(DateTime? dt) {
+  if (dt == null) return null;
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(dt.year, dt.month, dt.day);
+  final daysAgo = today.difference(day).inDays;
+  if (daysAgo == 0) return DateFormat('HH:mm').format(dt);
+  if (daysAgo < 7) return DateFormat('EEEE').format(dt).toUpperCase();
+  return DateFormat('dd/MM').format(dt);
 }
 
 // ─── Creator Inbox (sorted by most recent activity) ──────────────────────────
@@ -77,7 +78,7 @@ class _CreatorInbox extends StatelessWidget {
             return ListView.separated(
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: totalCount,
-              separatorBuilder: (_, __) => const Divider(height: 1, indent: 72),
+              separatorBuilder: (_, __) => const Divider(height: 1, indent: 88, endIndent: 20),
               itemBuilder: (context, index) {
                 if (index < conversations.length) {
                   final conv = conversations[index];
@@ -125,7 +126,7 @@ class _SubscriberInbox extends StatelessWidget {
         return ListView.separated(
           padding: const EdgeInsets.symmetric(vertical: 8),
           itemCount: subscriptions.length,
-          separatorBuilder: (_, __) => const Divider(height: 1, indent: 72),
+          separatorBuilder: (_, __) => const Divider(height: 1, indent: 88, endIndent: 20),
           itemBuilder: (context, index) {
             final sub = subscriptions[index];
             return _ConversationTile(
@@ -136,6 +137,111 @@ class _SubscriberInbox extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+// ─── Shared conversation row (Figma "Conversation item") ─────────────────────
+
+class _ConversationRow extends StatelessWidget {
+  final String name;
+  final String? photoUrl;
+  final String lastMessage;
+  final String? timeLabel;
+  final int unreadCount;
+  final VoidCallback onTap;
+
+  const _ConversationRow({
+    required this.name,
+    required this.photoUrl,
+    required this.lastMessage,
+    required this.timeLabel,
+    required this.unreadCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasUnread = unreadCount > 0;
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClosrAvatar(
+              photoUrl: photoUrl,
+              initialSource: name,
+              size: 52,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: hasUnread ? FontWeight.w700 : FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    lastMessage,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: hasUnread
+                          ? theme.colorScheme.onSurface
+                          : theme.colorScheme.onSurfaceVariant,
+                      fontWeight: hasUnread ? FontWeight.w500 : FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const SizedBox(height: 4),
+                if (timeLabel != null)
+                  Text(
+                    timeLabel!,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: hasUnread
+                          ? ClosrColors.ember
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                if (hasUnread) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: ClosrColors.ember,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      unreadCount > 99 ? '99+' : '$unreadCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -155,20 +261,14 @@ class _CreatorConversationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final convId = '${subscriberUid}_$creatorUid';
     final lastMessage = conversationMeta?['lastMessage'] as String? ?? 'No messages yet';
     final unreadCount = (conversationMeta?['unreadForCreator'] as int?) ?? 0;
-    final hasUnread = unreadCount > 0;
 
     String? timeLabel;
     final lastAt = conversationMeta?['lastMessageAt'];
     if (lastAt != null) {
       try {
-        final dt = (lastAt as Timestamp).toDate();
-        final now = DateTime.now();
-        timeLabel = now.difference(dt).inHours < 24
-            ? DateFormat('HH:mm').format(dt)
-            : DateFormat('dd/MM').format(dt);
+        timeLabel = conversationTimeLabel((lastAt as Timestamp).toDate());
       } catch (_) {}
     }
 
@@ -178,56 +278,12 @@ class _CreatorConversationTile extends StatelessWidget {
         final name = snap.data?.displayName ?? '...';
         final photoUrl = snap.data?.photoUrl;
 
-        final scheme = Theme.of(context).colorScheme;
-        return ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          leading: CircleAvatar(
-            radius: 26,
-            backgroundColor: ClosrColors.emberSoft,
-            backgroundImage: photoUrl != null ? NetworkImage(photoUrl) as ImageProvider : null,
-            child: photoUrl == null
-                ? Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: const TextStyle(color: ClosrColors.ink, fontWeight: FontWeight.bold))
-                : null,
-          ),
-          title: Text(name,
-              style: TextStyle(fontWeight: hasUnread ? FontWeight.bold : FontWeight.w600)),
-          subtitle: Text(
-            lastMessage,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: hasUnread ? scheme.onSurface : scheme.onSurfaceVariant,
-              fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
-              fontSize: 13,
-            ),
-          ),
-          trailing: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (timeLabel != null)
-                Text(timeLabel,
-                    style: TextStyle(
-                      color: hasUnread ? ClosrColors.ember : scheme.onSurfaceVariant,
-                      fontSize: 12,
-                      fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
-                    )),
-              if (hasUnread) ...[
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: ClosrColors.ember, borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    unreadCount > 99 ? '99+' : '$unreadCount',
-                    style: const TextStyle(color: ClosrColors.paper, fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ],
-          ),
+        return _ConversationRow(
+          name: name,
+          photoUrl: photoUrl,
+          lastMessage: lastMessage,
+          timeLabel: timeLabel,
+          unreadCount: unreadCount,
           onTap: () => Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => ChatScreen(creatorUid: creatorUid, subscriberUid: subscriberUid),
           )),
@@ -270,69 +326,20 @@ class _ConversationTile extends StatelessWidget {
             final meta = convSnap.data;
             final lastMessage = meta?['lastMessage'] as String? ?? 'No messages yet';
             final unreadCount = (meta?[unreadField] as int?) ?? 0;
-            final hasUnread = unreadCount > 0;
             final lastAt = meta?['lastMessageAt'];
             String? timeLabel;
             if (lastAt != null) {
               try {
-                final dt = (lastAt as dynamic).toDate() as DateTime;
-                final now = DateTime.now();
-                timeLabel = now.difference(dt).inHours < 24
-                    ? DateFormat('HH:mm').format(dt)
-                    : DateFormat('dd/MM').format(dt);
+                timeLabel = conversationTimeLabel((lastAt as dynamic).toDate() as DateTime);
               } catch (_) {}
             }
 
-            final scheme = Theme.of(context).colorScheme;
-            return ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              leading: CircleAvatar(
-                radius: 26,
-                backgroundColor: ClosrColors.emberSoft,
-                backgroundImage: photoUrl != null ? NetworkImage(photoUrl) as ImageProvider : null,
-                child: photoUrl == null
-                    ? Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                        style: const TextStyle(color: ClosrColors.ink, fontWeight: FontWeight.bold))
-                    : null,
-              ),
-              title: Text(name,
-                  style: TextStyle(fontWeight: hasUnread ? FontWeight.bold : FontWeight.w600)),
-              subtitle: Text(
-                lastMessage,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: hasUnread ? scheme.onSurface : scheme.onSurfaceVariant,
-                  fontWeight: hasUnread ? FontWeight.w500 : FontWeight.normal,
-                  fontSize: 13,
-                ),
-              ),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (timeLabel != null)
-                    Text(timeLabel,
-                        style: TextStyle(
-                          color: hasUnread ? ClosrColors.ember : scheme.onSurfaceVariant,
-                          fontSize: 12,
-                          fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
-                        )),
-                  if (hasUnread) ...[
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: ClosrColors.ember, borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        unreadCount > 99 ? '99+' : '$unreadCount',
-                        style: const TextStyle(color: ClosrColors.paper, fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+            return _ConversationRow(
+              name: name,
+              photoUrl: photoUrl,
+              lastMessage: lastMessage,
+              timeLabel: timeLabel,
+              unreadCount: unreadCount,
               onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => ChatScreen(
                   creatorUid: subscription.creatorUid,
@@ -348,18 +355,23 @@ class _ConversationTile extends StatelessWidget {
 }
 
 Widget _buildEmpty(BuildContext context, bool isCreator) {
+  final theme = Theme.of(context);
   return Center(
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.chat_outlined, size: 64, color: ClosrColors.emberSoft),
+        const Icon(Icons.chat_outlined, size: 64, color: ClosrColors.emberSoft),
         const SizedBox(height: 16),
         Text('No discussions yet',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            style: theme.textTheme.titleMedium
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
         const SizedBox(height: 8),
         Text(
-          isCreator ? 'Your subscribers will appear here' : 'Subscribe to a creator to start chatting',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          isCreator
+              ? 'Your subscribers will appear here'
+              : 'Subscribe to a creator to start chatting',
+          style: theme.textTheme.bodyMedium
+              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
       ],
     ),
