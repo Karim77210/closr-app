@@ -48,6 +48,13 @@ class CircleIconButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: radius,
+        overlayColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.pressed) ||
+              states.contains(WidgetState.hovered)) {
+            return ClosrColors.emberHover.withAlpha(filled ? 60 : 30);
+          }
+          return null;
+        }),
         child: Container(
           width: size,
           height: size,

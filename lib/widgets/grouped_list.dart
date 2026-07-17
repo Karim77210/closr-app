@@ -90,6 +90,13 @@ class GroupedRow extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
+      overlayColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.pressed) ||
+            states.contains(WidgetState.hovered)) {
+          return ClosrColors.emberHover.withAlpha(20);
+        }
+        return null;
+      }),
       child: SizedBox(
         height: 48,
         child: Padding(

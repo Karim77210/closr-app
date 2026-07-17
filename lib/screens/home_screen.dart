@@ -1,22 +1,53 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:closr_app/models/user_model.dart';
+import 'package:closr_app/services/firestore_service.dart';
 import 'package:closr_app/widgets/circle_icon_button.dart';
 import 'package:closr_app/widgets/closr_avatar.dart';
 import 'package:closr_app/widgets/page_heading.dart';
 import 'broadcast_screen.dart';
 import 'discussions_screen.dart';
 import 'profile_screen.dart';
+import 'wallet_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   final AppUser user;
 
   const HomeScreen({Key? key, required this.user}) : super(key: key);
 
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final _firestoreService = FirestoreService();
+  late AppUser _user;
+  StreamSubscription<AppUser?>? _userSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _user = widget.user;
+    // The initial `user` is a one-time snapshot from AuthWrapper — stream it
+    // live so things like `stripeConnectOnboarded` update immediately after
+    // e.g. connecting Stripe, instead of needing an app restart to notice.
+    _userSub = _firestoreService.streamUser(widget.user.uid).listen((u) {
+      if (u != null && mounted) setState(() => _user = u);
+    });
+  }
+
+  @override
+  void dispose() {
+    _userSub?.cancel();
+    super.dispose();
+  }
+
   String get _publicLink {
     final origin = kIsWeb ? Uri.base.origin : 'https://closr.app';
-    return '$origin/${user.username}';
+    return '$origin/${_user.username}';
   }
 
   Future<void> _copyPublicLink(BuildContext context) async {
@@ -27,9 +58,40 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  void _handleShareTap(BuildContext context) {
+    if (_user.stripeConnectOnboarded) {
+      _copyPublicLink(context);
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Connect Stripe first'),
+        content: const Text(
+          'You need to set up your Stripe account before you can share your paid link and start receiving subscriptions. Go to your profile → Wallet to connect it.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => WalletScreen(creator: _user)),
+              );
+            },
+            child: const Text('Go to Wallet'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isCreator = user.role == UserRole.creator;
+    final isCreator = _user.role == UserRole.creator;
 
     return Scaffold(
       body: SafeArea(
@@ -47,30 +109,28 @@ class HomeScreen extends StatelessWidget {
                     children: [
                       if (isCreator) ...[
                         CircleIconButton(
-                          icon: Icons.share_outlined,
+                          icon: LucideIcons.share2,
                           variant: CircleIconButtonVariant.filled,
-                          size: 40,
-                          onTap: () => _copyPublicLink(context),
+                          onTap: () => _handleShareTap(context),
                         ),
                         const SizedBox(width: 10),
                         CircleIconButton(
-                          icon: Icons.campaign_outlined,
-                          size: 40,
+                          icon: LucideIcons.megaphone,
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => BroadcastScreen(creator: user),
+                              builder: (_) => BroadcastScreen(creator: _user),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 18),
                       ],
                       ClosrAvatar(
-                        photoUrl: user.photoUrl?.isNotEmpty == true ? user.photoUrl : null,
-                        initialSource: user.displayName,
-                        size: 40,
+                        photoUrl: _user.photoUrl?.isNotEmpty == true ? _user.photoUrl : null,
+                        initialSource: _user.displayName,
+                        size: 42,
                         ring: true,
                         onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => ProfileScreen(user: user)),
+                          MaterialPageRoute(builder: (_) => ProfileScreen(user: _user)),
                         ),
                       ),
                     ],
@@ -85,7 +145,7 @@ class HomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
 
-                Expanded(child: DiscussionsScreen(user: user)),
+                Expanded(child: DiscussionsScreen(user: _user)),
               ],
             ),
           ),

@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/foundation.dart' show Uint8List;
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:closr_app/main.dart' show PendingNavigation;
 import 'package:closr_app/models/user_model.dart';
@@ -225,7 +226,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       appBar: _selectedRole != null
           ? AppBar(
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                icon: const Icon(LucideIcons.chevronLeft, size: 24),
                 onPressed: _isLoading
                     ? null
                     : () {
@@ -282,7 +283,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         role: UserRole.creator,
         title: 'Creator',
         description: 'Monetize your audience\nwith paid subscribers.',
-        icon: Icons.star_outline,
+        icon: LucideIcons.star,
       ),
       const SizedBox(height: 16),
       _buildRoleCard(
@@ -290,7 +291,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         role: UserRole.subscriber,
         title: 'Subscriber',
         description: 'Connect and support\nthe creators you love!',
-        icon: Icons.person_outline,
+        icon: LucideIcons.user,
       ),
     ];
   }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/stripe_service.dart';
@@ -25,6 +26,12 @@ class _WalletScreenState extends State<WalletScreen> {
   String? _earningsError;
   List<_SubscriberEntry> _allEntries = [];
   bool _showAllSubscribers = false;
+
+  // Real, live balance on the creator's Stripe Connect account — the source
+  // of truth for "what the creator has earned" (money lands here immediately
+  // on each subscription payment; see createCheckoutSession destination charge).
+  int _availableCents = 0;
+  int _pendingCents = 0;
 
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   bool _autoPayoutEnabled = false;
@@ -76,7 +83,12 @@ class _WalletScreenState extends State<WalletScreen> {
         }
       }
       entries.sort((a, b) => b.date.compareTo(a.date));
-      setState(() { _allEntries = entries; _loadingEarnings = false; });
+      setState(() {
+        _allEntries = entries;
+        _availableCents = data['availableCents'] as int? ?? 0;
+        _pendingCents = data['pendingCents'] as int? ?? 0;
+        _loadingEarnings = false;
+      });
     } catch (e) {
       setState(() { _earningsError = e.toString().replaceFirst('Exception: ', ''); _loadingEarnings = false; });
     }
@@ -88,7 +100,6 @@ class _WalletScreenState extends State<WalletScreen> {
   int get _grossCents => _monthEntries.fold(0, (sum, e) => sum + e.amountCents);
   int get _commissionCents => (_grossCents * 0.15).round();
   int get _netCents => _grossCents - _commissionCents;
-  int get _totalNetAllTime => (_allEntries.fold(0, (s, e) => s + e.amountCents) * 0.85).round();
 
   String _fmt(int cents) => '€${(cents / 100).toStringAsFixed(2)}';
 
@@ -144,30 +155,6 @@ class _WalletScreenState extends State<WalletScreen> {
     }
   }
 
-  Future<void> _handleChangeStripeAccount() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Change Stripe account'),
-        content: const Text('This will disconnect your current account and start a new Stripe onboarding. Continue?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Continue')),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    // Reset Connect fields in Firestore
-    await _firestoreService.updateUser(widget.creator.uid, {
-      'stripeConnectAccountId': null,
-      'stripeConnectOnboarded': false,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-    setState(() => _stripeConnectOnboarded = false);
-    await _handleConnectStripe();
-  }
-
   Future<void> _handleRequestPayout() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -204,7 +191,7 @@ class _WalletScreenState extends State<WalletScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          icon: const Icon(LucideIcons.chevronLeft, size: 24),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -220,23 +207,21 @@ class _WalletScreenState extends State<WalletScreen> {
                 Text(
                   'Earnings',
                   style: theme.textTheme.titleMedium?.copyWith(
-                    fontSize: 15,
-                    color: theme.colorScheme.onSurfaceVariant,
+                    color: theme.colorScheme.onSurface.withAlpha(102),
+                    height: 1,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
-                  _loadingEarnings ? '€ …' : _fmt(_netCents),
-                  style: theme.textTheme.headlineLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  _loadingEarnings ? '€ …' : _fmt(_availableCents + _pendingCents),
+                  style: theme.textTheme.headlineLarge,
                 ),
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     CircleIconButton(
-                      icon: Icons.chevron_left,
+                      icon: LucideIcons.chevronLeft,
                       size: 36,
                       onTap: _prevMonth,
                     ),
@@ -248,7 +233,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       ),
                     ),
                     CircleIconButton(
-                      icon: Icons.chevron_right,
+                      icon: LucideIcons.chevronRight,
                       size: 36,
                       onTap: _nextMonth,
                     ),
@@ -410,12 +395,12 @@ class _WalletScreenState extends State<WalletScreen> {
           const Divider(height: 20),
           Row(
             children: [
-              Icon(Icons.account_balance_outlined, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              Icon(LucideIcons.landmark, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   _stripeConnectOnboarded
-                      ? 'Payments sent to your Stripe Connect bank account'
+                      ? 'Payouts are sent to your bank account (IBAN)'
                       : 'Connect your Stripe account to receive payouts',
                   style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
@@ -433,7 +418,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
                   : Text(
                       _stripeConnectOnboarded
-                          ? 'Request Payout · ${_fmt(_totalNetAllTime)}'
+                          ? 'Request Payout · ${_fmt(_availableCents)}'
                           : 'Connect Stripe first',
                     ),
             ),
@@ -453,29 +438,18 @@ class _WalletScreenState extends State<WalletScreen> {
           const SizedBox(height: 8),
           if (_stripeConnectOnboarded) ...[
             Row(children: const [
-              Icon(Icons.check_circle, color: ClosrColors.green, size: 20),
+              Icon(LucideIcons.circleCheck, color: ClosrColors.green, size: 20),
               SizedBox(width: 8),
               Text('Account connected', style: TextStyle(color: ClosrColors.green, fontWeight: FontWeight.w500)),
             ]),
             const SizedBox(height: 12),
-            Row(children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _connectLoading ? null : _handleManageStripe,
-                  child: const Text('Manage account'),
-                ),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _connectLoading ? null : _handleManageStripe,
+                child: const Text('Manage account'),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _connectLoading ? null : _handleChangeStripeAccount,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  child: const Text('Change account'),
-                ),
-              ),
-            ]),
+            ),
           ]
           else ...[
             Text(
@@ -487,9 +461,6 @@ class _WalletScreenState extends State<WalletScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _connectLoading ? null : _handleConnectStripe,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
                 child: _connectLoading
                     ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Text('Connect Stripe Account'),
@@ -520,8 +491,52 @@ class _SubscriberEntry {
 
 // ─── Connect success screen ───────────────────────────────────────────────────
 
-class WalletConnectSuccessScreen extends StatelessWidget {
+class WalletConnectSuccessScreen extends StatefulWidget {
   const WalletConnectSuccessScreen({Key? key}) : super(key: key);
+
+  @override
+  State<WalletConnectSuccessScreen> createState() => _WalletConnectSuccessScreenState();
+}
+
+class _WalletConnectSuccessScreenState extends State<WalletConnectSuccessScreen> {
+  final _stripeService = StripeService();
+  bool _loading = true;
+  bool _confirmed = false;
+  String? _error;
+  String? _resumeUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _confirmOnboarding();
+  }
+
+  // Stripe's redirect back here doesn't flip `stripeConnectOnboarded` on its
+  // own — calling createConnectOnboarding again re-checks the account and
+  // updates Firestore if it's now fully verified. Without this, the flag
+  // only ever updates the next time someone taps "Connect Stripe Account".
+  Future<void> _confirmOnboarding() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final url = await _stripeService.createConnectOnboarding();
+      if (!mounted) return;
+      setState(() {
+        _confirmed = url == null; // null means Stripe reported fully onboarded
+        _resumeUrl = url;
+        _loading = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _resumeOnboarding() async {
+    if (_resumeUrl == null) { _confirmOnboarding(); return; }
+    await launchUrl(Uri.parse(_resumeUrl!), mode: LaunchMode.platformDefault);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -536,32 +551,58 @@ class WalletConnectSuccessScreen extends StatelessWidget {
               padding: const EdgeInsets.all(32),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 80, height: 80,
-                    decoration: BoxDecoration(color: ClosrColors.green.withAlpha(30), shape: BoxShape.circle),
-                    child: const Icon(Icons.check_circle_outline, size: 48, color: ClosrColors.green),
-                  ),
-                  const SizedBox(height: 24),
-                  Text('Stripe account connected!',
-                      style: theme.textTheme.titleMedium?.copyWith(fontSize: 20)),
-                  const SizedBox(height: 12),
-                  Text(
-                    'You can now request payouts directly to your bank account.',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false),
-                      child: const Text('Back to Wallet'),
-                    ),
-                  ),
-                ],
+                children: _loading
+                    ? const [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('Confirming your Stripe account…'),
+                      ]
+                    : _error != null
+                        ? [
+                            const Icon(LucideIcons.circleAlert, size: 48, color: ClosrColors.rose),
+                            const SizedBox(height: 16),
+                            Text(_error!, textAlign: TextAlign.center,
+                                style: const TextStyle(color: ClosrColors.rose, fontSize: 13)),
+                            const SizedBox(height: 16),
+                            ElevatedButton(onPressed: _confirmOnboarding, child: const Text('Retry')),
+                          ]
+                        : _confirmed
+                            ? [
+                                Container(
+                                  width: 80, height: 80,
+                                  decoration: BoxDecoration(color: ClosrColors.green.withAlpha(30), shape: BoxShape.circle),
+                                  child: const Icon(LucideIcons.circleCheck, size: 48, color: ClosrColors.green),
+                                ),
+                                const SizedBox(height: 24),
+                                Text('Stripe account connected!',
+                                    style: theme.textTheme.titleMedium?.copyWith(fontSize: 20)),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'You can now request payouts directly to your bank account.',
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(height: 32),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false),
+                                    child: const Text('Back to Wallet'),
+                                  ),
+                                ),
+                              ]
+                            : [
+                                const Icon(LucideIcons.circleAlert, size: 48, color: ClosrColors.rose),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Your Stripe setup isn\'t complete yet. Please finish onboarding to start receiving payouts.',
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton(onPressed: _resumeOnboarding, child: const Text('Finish setup')),
+                              ],
               ),
             ),
           ),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:closr_app/models/user_model.dart';
@@ -51,15 +52,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadBalance() async {
     try {
+      // Same live Stripe Connect balance the Wallet screen shows — not a
+      // recomputation from invoice history, so the two never disagree.
       final data = await _stripeService.getCreatorEarnings();
-      final subs = (data['subscribers'] as List).cast<Map<String, dynamic>>();
-      int grossCents = 0;
-      for (final sub in subs) {
-        for (final inv in (sub['invoices'] as List).cast<Map<String, dynamic>>()) {
-          grossCents += inv['amountPaid'] as int;
-        }
-      }
-      if (mounted) setState(() { _balanceCents = (grossCents * 0.85).round(); _balanceLoading = false; });
+      final availableCents = data['availableCents'] as int? ?? 0;
+      final pendingCents = data['pendingCents'] as int? ?? 0;
+      if (mounted) setState(() { _balanceCents = availableCents + pendingCents; _balanceLoading = false; });
     } catch (_) {
       if (mounted) setState(() => _balanceLoading = false);
     }
@@ -89,7 +87,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Navigator.pop(context);
               try {
                 await _authService.signOut();
-                // Navigation is handled automatically by StreamBuilder in main.dart
+                // The auth StreamBuilder in main.dart swaps in LoginScreen at
+                // the root, but it can't pop routes pushed on top of it (e.g.
+                // this Settings screen) — do that explicitly so the login
+                // screen is actually visible instead of stuck underneath.
+                if (mounted) {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                }
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -219,8 +223,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   for (final p in providers)
                     GroupedRow(
                       icon: p.providerId == 'google.com'
-                          ? Icons.g_mobiledata
-                          : Icons.email_outlined,
+                          ? LucideIcons.globe
+                          : LucideIcons.mail,
                       label: p.providerId == 'google.com'
                           ? 'Google — ${p.email ?? _user.email}'
                           : 'Email — ${p.email ?? _user.email}',
@@ -271,7 +275,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          icon: const Icon(LucideIcons.chevronLeft, size: 24),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -292,21 +296,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           if (isCreator) ...[
+                            // Figma: "Balance" 17 SemiBold at 40% opacity
                             Text(
                               'Balance',
                               style: theme.textTheme.titleMedium?.copyWith(
-                                fontSize: 15,
-                                color: theme.colorScheme.onSurfaceVariant,
+                                color: theme.colorScheme.onSurface.withAlpha(102),
+                                height: 1,
                               ),
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 4),
                             Text(
                               _balanceText,
-                              style: theme.textTheme.headlineLarge?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+                              style: theme.textTheme.headlineLarge,
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 12),
                             OutlinedButton(
                               onPressed: () => Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -334,10 +337,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           onTap: _openEditProfile,
                           onEditTap: _openEditProfile,
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 14),
                         Text('@${_user.username}', style: theme.textTheme.titleMedium),
                         if (_user.bio.trim().isNotEmpty) ...[
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 12),
                           SizedBox(
                             width: 180,
                             child: Text(
@@ -346,7 +349,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
+                                color: theme.colorScheme.onSurface.withAlpha(102),
                               ),
                             ),
                           ),
@@ -362,7 +365,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 GroupedSection(
                   children: [
                     GroupedRow(
-                      icon: Icons.lock_outline,
+                      icon: LucideIcons.lock,
                       label: 'Payment methods',
                       onTap: _handlePaymentMethods,
                     ),
@@ -374,17 +377,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 GroupedSection(
                   children: [
                     GroupedRow(
-                      icon: Icons.lock_outline,
+                      icon: LucideIcons.lock,
                       label: 'Change password',
                       onTap: _handleChangePassword,
                     ),
                     GroupedRow(
-                      icon: Icons.email_outlined,
+                      icon: LucideIcons.mail,
                       label: 'Change email address',
                       onTap: _handleChangeEmail,
                     ),
                     GroupedRow(
-                      icon: Icons.grid_view_outlined,
+                      icon: LucideIcons.layoutGrid,
                       label: 'Manage connected apps',
                       onTap: _showConnectedApps,
                     ),
@@ -397,7 +400,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     if (isCreator) ...[
                       GroupedRow(
-                        icon: Icons.settings_outlined,
+                        icon: LucideIcons.settings,
                         label: 'Creator Settings',
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
@@ -406,13 +409,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       GroupedRow(
-                        icon: Icons.trending_up_outlined,
+                        icon: LucideIcons.trendingUp,
                         label: 'Analytics',
                         onTap: _comingSoon,
                       ),
                     ] else
                       GroupedRow(
-                        icon: Icons.star_outline,
+                        icon: LucideIcons.star,
                         label: 'Become a Creator',
                         onTap: () => _showBecomeCreatorSheet(context),
                       ),
@@ -424,12 +427,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 GroupedSection(
                   children: [
                     GroupedRow(
-                      icon: Icons.privacy_tip_outlined,
+                      icon: LucideIcons.shield,
                       label: 'Privacy Policy',
                       onTap: _comingSoon,
                     ),
                     GroupedRow(
-                      icon: Icons.logout,
+                      icon: LucideIcons.logOut,
                       label: 'Sign Out',
                       destructive: true,
                       onTap: _handleSignOut,

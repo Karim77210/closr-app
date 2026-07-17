@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:video_player/video_player.dart';
 import 'package:closr_app/models/message_model.dart';
 
@@ -52,7 +53,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
+          icon: const Icon(LucideIcons.x, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
@@ -108,7 +109,7 @@ class _ImagePage extends StatelessWidget {
                 ? child
                 : const Center(child: CircularProgressIndicator(color: Colors.white)),
             errorBuilder: (_, __, ___) =>
-                const Center(child: Icon(Icons.broken_image, color: Colors.white54, size: 64)),
+                const Center(child: Icon(LucideIcons.imageOff, color: Colors.white54, size: 64)),
           ),
         ),
         if (message.content.isNotEmpty)
@@ -225,7 +226,7 @@ class _VideoPageState extends State<_VideoPage> {
                       color: Colors.black.withAlpha(140),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.play_arrow, color: Colors.white, size: 44),
+                    child: const Icon(LucideIcons.play, color: Colors.white, size: 44),
                   ),
                 ),
               ),
@@ -270,7 +271,7 @@ class _VideoPageState extends State<_VideoPage> {
                       // Play/Pause button
                       IconButton(
                         icon: Icon(
-                          _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                          _controller.value.isPlaying ? LucideIcons.pause : LucideIcons.play,
                           color: Colors.white,
                         ),
                         onPressed: _togglePlay,
@@ -287,7 +288,7 @@ class _VideoPageState extends State<_VideoPage> {
                       // Volume
                       IconButton(
                         icon: Icon(
-                          _controller.value.volume > 0 ? Icons.volume_up : Icons.volume_off,
+                          _controller.value.volume > 0 ? LucideIcons.volume2 : LucideIcons.volumeOff,
                           color: Colors.white70,
                           size: 20,
                         ),

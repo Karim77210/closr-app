@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/auth_service.dart';
 import 'package:closr_app/widgets/loading_overlay.dart';
@@ -102,7 +103,7 @@ class _CreatorSettingsScreenState extends State<CreatorSettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          icon: const Icon(LucideIcons.chevronLeft, size: 24),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),

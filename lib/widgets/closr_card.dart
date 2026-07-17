@@ -36,6 +36,13 @@ class ClosrCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
+        overlayColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.pressed) ||
+              states.contains(WidgetState.hovered)) {
+            return ClosrColors.emberHover.withAlpha(20);
+          }
+          return null;
+        }),
         child: card,
       ),
     );

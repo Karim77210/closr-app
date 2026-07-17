@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/auth_service.dart';
@@ -102,7 +103,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          icon: const Icon(LucideIcons.chevronLeft, size: 24),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -139,7 +140,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 GroupedSection(
                   children: [
                     GroupedRow(
-                      icon: Icons.person_outline,
+                      icon: LucideIcons.user,
                       label: 'Change display name',
                       onTap: () => _editField(
                         title: 'Change display name',
@@ -152,7 +153,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     ),
                     GroupedRow(
-                      icon: Icons.alternate_email,
+                      icon: LucideIcons.atSign,
                       label: 'Change username',
                       onTap: () => _editField(
                         title: 'Change username',
@@ -166,7 +167,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     ),
                     GroupedRow(
-                      icon: Icons.edit_note_outlined,
+                      icon: LucideIcons.penLine,
                       label: 'Change bio',
                       onTap: () => _editField(
                         title: 'Change bio',

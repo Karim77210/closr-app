@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import 'package:video_player/video_player.dart';
 import 'package:closr_app/screens/media_viewer_screen.dart';
@@ -242,7 +243,7 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+          icon: const Icon(LucideIcons.chevronLeft, size: 24),
           onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false),
         ),
         titleSpacing: 0,
@@ -318,7 +319,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.chat_bubble_outline, size: 48, color: ClosrColors.emberSoft),
+                const Icon(LucideIcons.messageCircle, size: 48, color: ClosrColors.emberSoft),
                 const SizedBox(height: 12),
                 Text(
                   _isCreator ? 'Start the conversation' : 'Send your first message',
@@ -392,9 +393,10 @@ class _ChatScreenState extends State<ChatScreen> {
               children: [
                 if (_isCreator) ...[
                   CircleIconButton(
-                    icon: Icons.add_photo_alternate_outlined,
+                    icon: LucideIcons.imagePlus,
                     shape: CircleIconButtonShape.squircle,
                     size: 42,
+                    iconSize: 20,
                     onTap: _isUploading ? null : _pickAndPreviewMedia,
                   ),
                   const SizedBox(width: 8),
@@ -449,7 +451,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                           : ClosrColors.ember.withAlpha(80),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.send_rounded,
+                                    child: const Icon(LucideIcons.send,
                                         color: Colors.white, size: 16),
                                   ),
                                 ),
@@ -475,7 +477,7 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Row(
         children: [
           if (_cooldownRemaining > 0) ...[
-            const Icon(Icons.timer_outlined, size: 14, color: ClosrColors.ember),
+            const Icon(LucideIcons.timer, size: 14, color: ClosrColors.ember),
             const SizedBox(width: 4),
             const Text(
               'Wait',
@@ -487,7 +489,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             const SizedBox(width: 16),
           ],
-          Icon(Icons.chat_bubble_outline, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+          Icon(LucideIcons.messageCircle, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
           const SizedBox(width: 4),
           Text(
             '$_messagesRemainingToday / ${_creator!.maxMessagesPerDay} messages left today',
@@ -593,7 +595,7 @@ class _MultiMediaPreviewSheetState extends State<_MultiMediaPreviewSheet> {
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
+                  icon: const Icon(LucideIcons.x, color: Colors.white),
                   onPressed: () => Navigator.of(context).pop(null),
                 ),
                 const Spacer(),
@@ -627,7 +629,7 @@ class _MultiMediaPreviewSheetState extends State<_MultiMediaPreviewSheet> {
                         child: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
-                          child: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
+                          child: const Icon(LucideIcons.chevronLeft, color: Colors.white, size: 28),
                         ),
                       ),
                     ),
@@ -642,7 +644,7 @@ class _MultiMediaPreviewSheetState extends State<_MultiMediaPreviewSheet> {
                         child: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
-                          child: const Icon(Icons.chevron_right, color: Colors.white, size: 28),
+                          child: const Icon(LucideIcons.chevronRight, color: Colors.white, size: 28),
                         ),
                       ),
                     ),
@@ -712,7 +714,7 @@ class _MultiMediaPreviewSheetState extends State<_MultiMediaPreviewSheet> {
                                 color: ClosrColors.ember,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.send_rounded, color: Colors.white, size: 16),
+                              child: const Icon(LucideIcons.send, color: Colors.white, size: 16),
                             ),
                           ),
                         ),
@@ -794,7 +796,7 @@ class _MediaPageState extends State<_MediaPage> {
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(color: Colors.black.withAlpha(140), shape: BoxShape.circle),
-            child: const Icon(Icons.play_arrow, color: Colors.white, size: 40),
+            child: const Icon(LucideIcons.play, color: Colors.white, size: 40),
           ),
         ),
         Positioned(left: 0, right: 0, bottom: 0, child: VideoProgressIndicator(ctrl, allowScrubbing: true,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:closr_app/widgets/closr_card.dart';
 import 'package:closr_app/theme.dart';
 
@@ -28,7 +29,7 @@ class SubscriptionSuccessScreen extends StatelessWidget {
                       color: ClosrColors.green.withAlpha(30),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.check_circle_outline,
+                    child: const Icon(LucideIcons.circleCheck,
                         size: 48, color: ClosrColors.green),
                   ),
                   const SizedBox(height: 24),
@@ -55,15 +56,6 @@ class SubscriptionSuccessScreen extends StatelessWidget {
                       child: const Text('Go to my chats'),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  if (creatorUsername.isNotEmpty)
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil(
-                        '/$creatorUsername',
-                        (_) => false,
-                      ),
-                      child: Text('Back to @$creatorUsername'),
-                    ),
                 ],
               ),
             ),

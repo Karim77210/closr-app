@@ -42,6 +42,13 @@ export const createCheckoutSession = functions.https.onRequest((req, res) => {
         res.status(400).json({ error: 'Creator has reached their subscriber limit' }); return;
       }
 
+      // Payments are routed straight to the creator's Stripe Connect account
+      // (destination charge) — there's nowhere to send the money otherwise.
+      const connectAccountId = creator.stripeConnectAccountId as string | undefined;
+      if (!connectAccountId || !creator.stripeConnectOnboarded) {
+        res.status(400).json({ error: 'This creator has not finished setting up payments yet' }); return;
+      }
+
       const existing = await db.collection('subscriptions')
         .where('subscriberUid', '==', subscriberUid)
         .where('creatorUid', '==', creatorUid)
@@ -90,6 +97,12 @@ export const createCheckoutSession = functions.https.onRequest((req, res) => {
         success_url: `${appUrl}/#/subscription-success?session_id={CHECKOUT_SESSION_ID}&creator=${creator.username}`,
         cancel_url: `${appUrl}/#/${creator.username}`,
         metadata: { subscriberUid, creatorUid, type: 'direct_message' },
+        subscription_data: {
+          // Every recurring invoice is split automatically: 85% lands on the
+          // creator's Connect balance immediately, 15% stays with the platform.
+          application_fee_percent: 15,
+          transfer_data: { destination: connectAccountId },
+        },
       });
 
       res.json({ url: session.url });
@@ -185,9 +198,14 @@ async function handleSubscriptionUpdated(sub: Stripe.Subscription) {
   const subDoc = await findSubscriptionDoc(sub.id);
   if (!subDoc) return;
 
+  // The raw webhook payload's shape depends on the Stripe account's webhook
+  // API version, which can drop/relocate fields like current_period_end.
+  // Re-fetching with our pinned SDK version guarantees the shape we expect.
+  const fresh = await stripe.subscriptions.retrieve(sub.id);
+
   await subDoc.ref.update({
-    status: sub.status,
-    currentPeriodEnd: admin.firestore.Timestamp.fromMillis(sub.current_period_end * 1000),
+    status: fresh.status,
+    currentPeriodEnd: admin.firestore.Timestamp.fromMillis(fresh.current_period_end * 1000),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 }
@@ -225,6 +243,20 @@ export const getCreatorEarnings = functions.https.onRequest((req, res) => {
       const decoded = await admin.auth().verifyIdToken(authHeader.split('Bearer ')[1]);
       const creatorUid = decoded.uid;
 
+      const userDoc = await db.collection('users').doc(creatorUid).get();
+      const connectAccountId = userDoc.data()?.stripeConnectAccountId as string | undefined;
+
+      // What the creator has actually earned, straight from Stripe: money
+      // already settled on their Connect balance (available for payout) plus
+      // money still clearing from a recent payment (pending).
+      let availableCents = 0;
+      let pendingCents = 0;
+      if (connectAccountId) {
+        const balance = await stripe.balance.retrieve({ stripeAccount: connectAccountId });
+        availableCents = balance.available.filter(b => b.currency === 'eur').reduce((s, b) => s + b.amount, 0);
+        pendingCents = balance.pending.filter(b => b.currency === 'eur').reduce((s, b) => s + b.amount, 0);
+      }
+
       // Get all subscriptions (active + canceled) for this creator
       const subsSnap = await db.collection('subscriptions')
         .where('creatorUid', '==', creatorUid)
@@ -256,7 +288,7 @@ export const getCreatorEarnings = functions.https.onRequest((req, res) => {
         };
       }));
 
-      res.json({ subscribers: subscriberData });
+      res.json({ subscribers: subscriberData, availableCents, pendingCents });
     } catch (err) {
       console.error('getCreatorEarnings error:', err);
       res.status(500).json({ error: String(err) });
@@ -290,6 +322,10 @@ export const createConnectOnboarding = functions.https.onRequest((req, res) => {
           email: user.email as string,
           capabilities: { transfers: { requested: true } },
           metadata: { firebaseUid: creatorUid },
+          // Money only leaves for the creator's bank when we explicitly
+          // request a payout (button or monthly cron) — never on Stripe's
+          // own automatic schedule.
+          settings: { payouts: { schedule: { interval: 'manual' } } },
         });
         connectAccountId = account.id;
         await db.collection('users').doc(creatorUid).update({ stripeConnectAccountId: connectAccountId });
@@ -345,39 +381,15 @@ export const createStripeLoginLink = functions.https.onRequest((req, res) => {
 
 // ─── Payout helpers ──────────────────────────────────────────────────────────
 
-async function getCreatorGrossCents(creatorUid: string): Promise<number> {
-  const subsSnap = await db.collection('subscriptions')
-    .where('creatorUid', '==', creatorUid)
-    .get();
-
-  const totals = await Promise.all(subsSnap.docs.map(async (doc) => {
-    const sub = doc.data();
-    try {
-      const invoices = await stripe.invoices.list({
-        subscription: sub.stripeSubscriptionId,
-        limit: 100,
-      });
-      return invoices.data
-        .filter(inv => inv.status === 'paid' && inv.amount_paid > 0)
-        .reduce((sum, inv) => sum + inv.amount_paid, 0);
-    } catch (_) {
-      return 0;
-    }
-  }));
-
-  return totals.reduce((a, b) => a + b, 0);
+// The creator's real, current balance on Stripe — the single source of
+// truth. Payments arrive here immediately via destination charges, so this
+// number IS what the creator has earned, not a computed estimate.
+async function getConnectAccountAvailableCents(connectAccountId: string): Promise<number> {
+  const balance = await stripe.balance.retrieve({ stripeAccount: connectAccountId });
+  return balance.available.filter(b => b.currency === 'eur').reduce((sum, b) => sum + b.amount, 0);
 }
 
-async function getAlreadyPaidOutCents(creatorUid: string): Promise<number> {
-  const snap = await db.collection('payout_requests')
-    .where('creatorUid', '==', creatorUid)
-    .where('status', '==', 'paid')
-    .get();
-
-  return snap.docs.reduce((sum, doc) => sum + (doc.data().amount as number), 0);
-}
-
-async function executeTransfer(
+async function executePayout(
   creatorUid: string,
   connectAccountId: string,
   amountCents: number,
@@ -391,20 +403,24 @@ async function executeTransfer(
     requestedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  const transfer = await stripe.transfers.create({
-    amount: amountCents,
-    currency: 'eur',
-    destination: connectAccountId,
-    metadata: { creatorUid, payoutRequestId: requestRef.id, trigger },
-  });
+  // Sends money from the creator's Connect balance straight to the bank
+  // account (IBAN) they registered during onboarding.
+  const payout = await stripe.payouts.create(
+    {
+      amount: amountCents,
+      currency: 'eur',
+      metadata: { creatorUid, payoutRequestId: requestRef.id, trigger },
+    },
+    { stripeAccount: connectAccountId },
+  );
 
   await requestRef.update({
     status: 'paid',
-    stripeTransferId: transfer.id,
+    stripePayoutId: payout.id,
     processedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  return transfer.id;
+  return payout.id;
 }
 
 // ─── Request Payout ──────────────────────────────────────────────────────────
@@ -428,17 +444,13 @@ export const requestPayout = functions.https.onRequest((req, res) => {
         res.status(400).json({ error: 'Stripe Connect account not configured' }); return;
       }
 
-      const grossCents = await getCreatorGrossCents(creatorUid);
-      const netCents = Math.round(grossCents * 0.85);
-      const alreadyPaid = await getAlreadyPaidOutCents(creatorUid);
-      const available = netCents - alreadyPaid;
-
+      const available = await getConnectAccountAvailableCents(connectAccountId);
       if (available <= 0) {
         res.status(400).json({ error: 'No balance available to pay out' }); return;
       }
 
-      const transferId = await executeTransfer(creatorUid, connectAccountId, available, 'manual');
-      res.json({ success: true, transferId, amountCents: available });
+      const payoutId = await executePayout(creatorUid, connectAccountId, available, 'manual');
+      res.json({ success: true, payoutId, amountCents: available });
     } catch (err) {
       console.error('requestPayout error:', err);
       res.status(500).json({ error: String(err) });
@@ -463,22 +475,17 @@ export const monthlyAutoPayout = functions.pubsub
     }
 
     const results = await Promise.allSettled(creatorsSnap.docs.map(async (doc) => {
-      const creator = doc.data();
-      const creatorUid = creator.uid as string;
-      const connectAccountId = creator.stripeConnectAccountId as string;
+      const creatorUid = doc.id;
+      const connectAccountId = doc.data().stripeConnectAccountId as string;
 
-      const grossCents = await getCreatorGrossCents(creatorUid);
-      const netCents = Math.round(grossCents * 0.85);
-      const alreadyPaid = await getAlreadyPaidOutCents(creatorUid);
-      const available = netCents - alreadyPaid;
-
+      const available = await getConnectAccountAvailableCents(connectAccountId);
       if (available < 100) {
         console.log(`monthlyAutoPayout: skipping ${creatorUid} — available ${available}¢ below minimum`);
         return;
       }
 
-      const transferId = await executeTransfer(creatorUid, connectAccountId, available, 'auto');
-      console.log(`monthlyAutoPayout: transferred ${available}¢ to ${creatorUid} (${transferId})`);
+      const payoutId = await executePayout(creatorUid, connectAccountId, available, 'auto');
+      console.log(`monthlyAutoPayout: paid out ${available}¢ to ${creatorUid} (${payoutId})`);
     }));
 
     const failed = results.filter(r => r.status === 'rejected');

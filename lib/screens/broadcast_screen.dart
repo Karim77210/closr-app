@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:closr_app/models/message_model.dart';
@@ -113,7 +114,7 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          icon: const Icon(LucideIcons.chevronLeft, size: 24),
           onPressed: _isSending ? null : () => Navigator.of(context).pop(),
         ),
         title: const Text('Broadcast'),
@@ -173,18 +174,18 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.group_outlined,
+                          Icon(LucideIcons.users,
                               size: 16,
                               color: Theme.of(context).brightness == Brightness.dark
                                   ? ClosrColors.emberSoft
-                                  : ClosrColors.emberHover),
+                                  : ClosrColors.ember),
                           const SizedBox(width: 8),
                           Text(
                             'All active subscribers',
                             style: TextStyle(
                               color: Theme.of(context).brightness == Brightness.dark
                                   ? ClosrColors.emberSoft
-                                  : ClosrColors.emberHover,
+                                  : ClosrColors.ember,
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
                             ),
@@ -231,9 +232,10 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
                     child: Row(
                       children: [
                         CircleIconButton(
-                          icon: Icons.add_photo_alternate_outlined,
+                          icon: LucideIcons.imagePlus,
                           shape: CircleIconButtonShape.squircle,
                           size: 42,
+                          iconSize: 20,
                           onTap: _pickMedia,
                         ),
                         const SizedBox(width: 10),
@@ -272,7 +274,7 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                    child: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
+                    child: const Icon(LucideIcons.chevronLeft, color: Colors.white, size: 28),
                   ),
                 ),
               ),
@@ -288,7 +290,7 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                    child: const Icon(Icons.chevron_right, color: Colors.white, size: 28),
+                    child: const Icon(LucideIcons.chevronRight, color: Colors.white, size: 28),
                   ),
                 ),
               ),
@@ -312,7 +314,7 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
               child: Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                child: const Icon(Icons.close, color: Colors.white, size: 18),
+                child: const Icon(LucideIcons.x, color: Colors.white, size: 18),
               ),
             ),
           ),
@@ -367,7 +369,7 @@ class _BroadcastMediaTileState extends State<_BroadcastMediaTile> {
         child: Stack(alignment: Alignment.center, children: [
           AspectRatio(aspectRatio: _videoCtrl!.value.aspectRatio, child: IgnorePointer(child: VideoPlayer(_videoCtrl!))),
           if (!_videoCtrl!.value.isPlaying)
-            const Icon(Icons.play_arrow, color: Colors.white, size: 48),
+            const Icon(LucideIcons.play, color: Colors.white, size: 48),
         ]),
       );
     }

@@ -50,8 +50,8 @@ class StripeService {
     return body['url'] as String;
   }
 
-  /// Request a payout to the creator's Stripe Connect account.
-  /// Returns the amount actually transferred in cents.
+  /// Request a payout from the creator's Stripe Connect balance to their bank
+  /// account (IBAN). Returns the amount actually paid out in cents.
   Future<int> requestPayout() async {
     final token = await _authToken();
     final response = await http.post(

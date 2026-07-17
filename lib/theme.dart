@@ -203,6 +203,11 @@ class ClosrTheme {
       scaffoldBackgroundColor: scaffoldBackground,
       textTheme: textTheme,
       primaryColor: ClosrColors.ember,
+      // Figma sizes are exact px. Flutter's default adaptivePlatformDensity
+      // shrinks tappable controls on web/desktop below their intrinsic
+      // padding-derived size — pin it to standard so buttons/inputs render
+      // at the spec'd height instead of a compacted one.
+      visualDensity: VisualDensity.standard,
 
       appBarTheme: AppBarTheme(
         backgroundColor: appBarBg,

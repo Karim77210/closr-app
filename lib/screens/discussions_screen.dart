@@ -4,6 +4,7 @@ import 'package:closr_app/models/subscription_model.dart';
 import 'package:closr_app/models/user_model.dart';
 import 'package:closr_app/services/firestore_service.dart';
 import 'package:closr_app/screens/chat_screen.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:closr_app/widgets/closr_avatar.dart';
 import 'package:closr_app/theme.dart';
 import 'package:intl/intl.dart';
@@ -78,7 +79,12 @@ class _CreatorInbox extends StatelessWidget {
             return ListView.separated(
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: totalCount,
-              separatorBuilder: (_, __) => const Divider(height: 1, indent: 88, endIndent: 20),
+              separatorBuilder: (context, _) => Divider(
+            height: 1,
+            indent: 96,
+            endIndent: 20,
+            color: Theme.of(context).colorScheme.onSurface.withAlpha(26),
+          ),
               itemBuilder: (context, index) {
                 if (index < conversations.length) {
                   final conv = conversations[index];
@@ -126,7 +132,12 @@ class _SubscriberInbox extends StatelessWidget {
         return ListView.separated(
           padding: const EdgeInsets.symmetric(vertical: 8),
           itemCount: subscriptions.length,
-          separatorBuilder: (_, __) => const Divider(height: 1, indent: 88, endIndent: 20),
+          separatorBuilder: (context, _) => Divider(
+            height: 1,
+            indent: 96,
+            endIndent: 20,
+            color: Theme.of(context).colorScheme.onSurface.withAlpha(26),
+          ),
           itemBuilder: (context, index) {
             final sub = subscriptions[index];
             return _ConversationTile(
@@ -167,17 +178,24 @@ class _ConversationRow extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
+      overlayColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.pressed) ||
+            states.contains(WidgetState.hovered)) {
+          return ClosrColors.emberHover.withAlpha(20);
+        }
+        return null;
+      }),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             ClosrAvatar(
               photoUrl: photoUrl,
               initialSource: name,
-              size: 52,
+              size: 64,
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -360,7 +378,7 @@ Widget _buildEmpty(BuildContext context, bool isCreator) {
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.chat_outlined, size: 64, color: ClosrColors.emberSoft),
+        const Icon(LucideIcons.messageCircle, size: 64, color: ClosrColors.emberSoft),
         const SizedBox(height: 16),
         Text('No discussions yet',
             style: theme.textTheme.titleMedium

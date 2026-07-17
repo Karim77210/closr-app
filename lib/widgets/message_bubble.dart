@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:video_player/video_player.dart';
 import 'package:closr_app/models/message_model.dart';
 import 'package:closr_app/theme.dart';
@@ -142,7 +143,7 @@ class _ImageMessage extends StatelessWidget {
               ),
         errorBuilder: (_, __, ___) => const SizedBox(
           width: 80, height: 80,
-          child: Center(child: Icon(Icons.broken_image, size: 40, color: ClosrColors.muted)),
+          child: Center(child: Icon(LucideIcons.imageOff, size: 40, color: ClosrColors.muted)),
         ),
       ),
     );
@@ -197,7 +198,7 @@ class _VideoMessageState extends State<_VideoMessage> {
                     shape: BoxShape.circle,
                   ),
                   padding: const EdgeInsets.all(14),
-                  child: const Icon(Icons.play_arrow, color: Colors.white, size: 36),
+                  child: const Icon(LucideIcons.play, color: Colors.white, size: 32),
                 ),
               ],
             )

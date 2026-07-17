@@ -201,7 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       SizedBox(
                         width: double.infinity,
-                        height: 52,
+                        height: 40,
                         child: SignInButton(
                           Buttons.google,
                           text: _isSignUp ? 'Sign up with Google' : 'Sign in with Google',

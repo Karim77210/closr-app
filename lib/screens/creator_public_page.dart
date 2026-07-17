@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:closr_app/main.dart' show PendingNavigation;
 import 'package:closr_app/screens/chat_screen.dart';
@@ -276,7 +277,7 @@ class _CreatorPublicPageState extends State<CreatorPublicPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.search_off_outlined, size: 64, color: theme.colorScheme.onSurfaceVariant),
+            Icon(LucideIcons.searchX, size: 64, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(height: 16),
             Text('Creator not found',
                 textAlign: TextAlign.center,
